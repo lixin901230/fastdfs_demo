@@ -6,6 +6,7 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -21,13 +22,16 @@ import com.lx.platform.org.csource.fastdfs.TrackerServer;
 import com.lx.platform.util.HandleResultUtils;
 import com.lx.platform.util.JsonUtils;
 
+@Controller
+@RequestMapping("/uploadFile")
 public class UploadFileController extends BaseController {
 	
 	private static Logger logger = LoggerFactory.getLogger(UploadFileController.class);
 	
-	@RequestMapping(value = "/upload", method = RequestMethod.POST)
+	@RequestMapping(value = "/uploadToFdfs", method = RequestMethod.POST)
 	@ResponseBody
-	public Object upload(@RequestParam MultipartFile file) {
+	public Object uploadToFdfs(@RequestParam MultipartFile file) {
+
 		Map<String, Object> resultMap = new HashMap<String, Object>();
 		try {
 			if(file.isEmpty()){
