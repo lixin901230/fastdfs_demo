@@ -1,0 +1,344 @@
+系统环境：
+        红帽子企业发型版 5.4（RHEL_5.4 i386），提供个连接：https://yunpan.cn/c6TYK7j3WpEca  访问密码 f0cf
+        下面环境搭建所需的FastDFS及Nginx环境：https://yunpan.cn/c6TvJ982fCVu2  访问密码 1e8c，建议根据提供的官方网址自己去下载。
+
+一、首先安装libevent库
+	因为FastDFS安装时对libevent的版本有一定要求。注意先查看是否已安装，如果已安装且版本低于1.3，则卸载重装。
+	1、查看机器是否安装有libevent
+	[root@192 ~]# rpm -qa | grep libevent
+	libevent-1.1a-3.2.1
+	[root@192 ~]# 
+
+	2、存在libevent，为了后面安装fastdfs顺利，我们把它系统自带libevent卸掉，安装一个与所装fastdfs版本匹配的libevent；
+	卸载libevent：
+	[root@192 ~]# rpm -e libevent
+	error: Failed dependencies:
+		libevent-1.1a.so.1 is needed by (installed) nfs-utils-1.0.9-42.el5.i386
+		libevent is needed by (installed) nfs-utils-1.0.9-42.el5.i386
+	由于系统中各个软件包之间相互有依赖关系。如果因存在依赖关系而不能卸载，可以使用如下的命令来忽略依赖关系，直接开始卸载
+	忽略依赖关系卸载：
+	[root@192 ~]# rpm -e libevent --nodeps
+	卸载完成，确认是否成功
+	[root@192 ~]# rpm -qa | grep libevent
+	[root@192 ~]# 
+
+	3、下载libevent（http://libevent.org/ ），我下载的是libevent-2.0.14-stable.tar.gz版本安装。
+	将下载的文件传入服务器；
+	给文件授予执行权限：
+	[root@192 tools]# chmod 755 libevent-2.0.14-stable.tar.gz
+	解压：
+	[root@192 tools]# tar -zxvf libevent-2.0.14-stable.tar.gz
+	进入解压后的目录：
+	[root@192 tools]# cd libevent-2.0.14-stable
+	[root@192 libevent-2.0.14-stable]# ./configure --prefix=/usr
+	[root@192 libevent-2.0.14-stable]# make
+	[root@192 libevent-2.0.14-stable]# make install
+	注意：
+        1）执行make install时可能需要root权限
+        2）libevent会安装到 /usr/lib 或 /usr/local/lib下
+
+	测试libevent是否安装成功：
+	[root@192 libevent-2.0.14-stable]# ls -al /usr/lib | grep libevent
+	执行上面命令，出现以下内容说明安装成功：
+	lrwxrwxrwx 1 root root     21 08-07 19:58 libevent-2.0.so.5 -> libevent-2.0.so.5.1.3
+	-rwxr-xr-x 1 root root 759505 08-07 19:58 libevent-2.0.so.5.1.3
+	-rw-r--r-- 1 root root 985332 08-07 19:58 libevent.a
+	lrwxrwxrwx 1 root root     26 08-07 19:58 libevent_core-2.0.so.5 -> libevent_core-2.0.so.5.1.3
+	-rwxr-xr-x 1 root root 451842 08-07 19:58 libevent_core-2.0.so.5.1.3
+	-rw-r--r-- 1 root root 604498 08-07 19:58 libevent_core.a
+	-rwxr-xr-x 1 root root    994 08-07 19:58 libevent_core.la
+	lrwxrwxrwx 1 root root     26 08-07 19:58 libevent_core.so -> libevent_core-2.0.so.5.1.3
+	lrwxrwxrwx 1 root root     27 08-07 19:58 libevent_extra-2.0.so.5 -> libevent_extra-2.0.so.5.1.3
+	-rwxr-xr-x 1 root root 321463 08-07 19:58 libevent_extra-2.0.so.5.1.3
+	-rw-r--r-- 1 root root 380906 08-07 19:58 libevent_extra.a
+	-rwxr-xr-x 1 root root   1001 08-07 19:58 libevent_extra.la
+	lrwxrwxrwx 1 root root     27 08-07 19:58 libevent_extra.so -> libevent_extra-2.0.so.5.1.3
+	-rwxr-xr-x 1 root root    959 08-07 19:58 libevent.la
+	lrwxrwxrwx 1 root root     29 08-07 19:58 libevent_openssl-2.0.so.5 -> libevent_openssl-2.0.so.5.1.3
+	-rwxr-xr-x 1 root root  70335 08-07 19:58 libevent_openssl-2.0.so.5.1.3
+	-rw-r--r-- 1 root root  78648 08-07 19:58 libevent_openssl.a
+	-rwxr-xr-x 1 root root   1030 08-07 19:58 libevent_openssl.la
+	lrwxrwxrwx 1 root root     29 08-07 19:58 libevent_openssl.so -> libevent_openssl-2.0.so.5.1.3
+	lrwxrwxrwx 1 root root     30 08-07 19:58 libevent_pthreads-2.0.so.5 -> libevent_pthreads-2.0.so.5.1.3
+	-rwxr-xr-x 1 root root  14293 08-07 19:58 libevent_pthreads-2.0.so.5.1.3
+	-rw-r--r-- 1 root root  11822 08-07 19:58 libevent_pthreads.a
+	-rwxr-xr-x 1 root root   1022 08-07 19:58 libevent_pthreads.la
+	lrwxrwxrwx 1 root root     30 08-07 19:58 libevent_pthreads.so -> libevent_pthreads-2.0.so.5.1.3
+	lrwxrwxrwx 1 root root     21 08-07 19:58 libevent.so -> libevent-2.0.so.5.1.3
+	[root@192 libevent-2.0.14-stable]# 
+        
+       注意： 如果libevent的安装目录为/usr/local/lib下，则还需要建立 libevent-1.4.so.2 到 /usr/lib 的软连接，这样其他程序运行时才能找到libevent库
+        （或者 是在在64位机器上安装libevent，则需要建立 libevent-1.4.so.2 到 /us/lib64 的软连接）
+	创建软连接：（下面命令中红色部分为你的libevent安装路径，注意：只有libevent不是不是安装在 /usr/lib目录下是才需要创建该软连接）
+	[root@192 libevent-2.0.14-stable]# ln -s /usr/local/lib/libevent-2.0.so.5 /usr/lib/libevent-1.4.so.2
+	若执行上面命令提示：ln: 正在创建指向“/usr/local/lib/libevent-2.0.so.5”的符号链接“/usr/lib/libevent-1.4.so.2”: 文件已存在；
+	则删除软连接再创建，删除错误的软连接，可使用 rm -rf [软连接名字]
+	[root@192 libevent-2.0.14-stable]# rm -rf /usr/lib/libevent-1.4.so.2
+        重新创建：
+        [root@192 libevent-2.0.14-stable]# ln -s /usr/local/lib/libevent-2.0.so.5 /usr/lib/libevent-1.4.so.2
+	检查libevent安装是否完成：
+	[root@192 libevent-2.0.14-stable]# ls -al /usr/lib | grep libevent
+	执行上面命令出现下面内容说明和FastDFS配套的libevent安装完成
+	lrwxrwxrwx   1 root root       52 08-07 20:39 libevent-1.4.so.2 -> /usr/local/lib/libevent-2.0.so.5
+	[root@192 libevent-2.0.14-stable]#
+
+
+二、安装FastDFS
+	附件：
+		FastDFS官方中文学习内容在：http://bbs.chinaunix.net/forum.php?mod=forumdisplay&fid=240&page=1
+		FastDFS跟踪器和存储节点详细配置说明：http://bbs.chinaunix.net/thread-1941456-1-1.html
+
+	下载FastDFS_v4.06.tar.gz（https://sourceforge.net/projects/fastdfs/files/?source=navbar）
+	下载后上传到服务器
+	给文件授予执行权限：
+	[root@192 tools]# chmod 755 FastDFS_v4.06.tar.gz
+	解压：
+	[root@192 tools]# tar -zxvf FastDFS_v4.06.tar.gz
+	进入解压后的目录：
+	[root@192 tools]# cd FastDFS
+	安装：（注意检查整个过程中是否有报错信息，如果有说明上面的libevent可能没有安装好）
+	[root@192 FastDFS]# ./make.sh
+	[root@192 FastDFS]# ./make.sh install
+	至此FastDFS安装完成。
+	FastDFS安装在/usr/local/bin中。
+	配置文件安装在/etc/fastdfs/或/etc/fdfs/中。
+
+三、配置FastDFS
+	FastDFS的架构分为tracker（跟踪器）和 storage（存储节点）。
+	我安装的集群中，有一个tracker，IP地址为：192.168.0.150；
+	有3个storage，分为两组，group1包含的主机IP：192.168.0.150（即做tracker有做storage）、192.168.0.151 和 192.168.0.152。group2包含的主机IP：192.168.0.153。（每台storage存储节点服务器都装FastDFS配置存储节点配置）
+	创建 FastDFS 数据、日志存储目录：
+	[root@192 fdfs]# mkdir -p /usr/tools/data/fastdfs（环境测试tracker、storage、client使用这个一个目录，真实环境中目录分开）
+
+	我们安装的FastDFS配置文件在/etc/fdfs/目录下
+	进入FastDFS配置文件目录/etc/fdfs/：
+	[root@192 FastDFS]# cd /etc/fdfs/
+
+	查看配置文件列表：
+	[root@192 fdfs]# ls
+	client.conf		（客户端上传配置文件）
+	http.conf		（http服务器配置文件）
+	storage.conf	（文件存储服务器配置文件）
+	tracker.conf	（负责均衡调度服务器配置文件）
+	mime.types		
+	
+	配置中我只给出单机配置，集群配置只需在指定tracker服务和数据存储路径时根据机器多配置
+	1）修改tracker.conf配置文件：（由于配置内容很多，为了快速查找，可在vim后，输入 /base_path搜索或者输入 :setnu 显示行号）
+	[root@192 fdfs]# vim tracker.conf
+	base_path=/usr/tools/data/fastdfs	#存放日志路径
+	修改tracker.conf配置完毕，按esc，输入:wq保存修改。
+
+	2）修改storage.conf配置文件：
+	[root@192 fdfs]# vim storage.conf 
+	group_name=group1
+	base_path=/usr/tools/data/fastdfs		#存放日志路径
+	store_path0=/usr/tools/data/fastdfs		#上传文件路径
+	#store_path1=/usr/tools/data/fastdf2	#多台存储节点服务器集群时，可配置多个数据存储目录
+	tracker_server=192.168.0.150:22122		#tracker服务器地址
+	#tracker_server=192.168.0.149:22122		#tracker服务器亦可配置多个进行集群，每行配置一个，配置文件中已说明
+	修改storage.conf配置完毕，按esc，输入:wq保存修改。
+
+	3）修改client.conf配置文件：（这个配置在使用fdfs_test测试时使用，不测试，没什么用处）
+	base_path=/usr/tools/data/fastdfs	#存放日志路径
+	tracker_server=192.168.0.150:22122	#tracker服务器地址
+	修改client.conf配置完毕，按esc，输入:wq保存修改。
+
+	4）启动fdfs_trackerd和fdfs_storaged服务（启动顺序没要求，但理论上应该是先启动fdfs_trackerd）
+	启动fdfs_trackerd服务：
+	[root@192 fdfs]# /usr/local/bin/fdfs_trackerd /etc/fdfs/tracker.conf 
+	查看fdfs_trackerd是否启动成功：
+	[root@192 fdfs]# ps -ef | grep fdfs_trackerd
+	root     20642     1  0 23:16 ?        00:00:00 /usr/local/bin/fdfs_trackerd /etc/fdfs/tracker.conf
+	root     20653  4712  0 23:17 pts/1    00:00:00 grep fdfs_trackerd
+	输出上面内容，说明启动成功。
+	
+	启动fdfs_storaged服务：（第一次启动fdfs_storaged服务时，会创建数据存储子目录）
+	[root@192 fdfs]# /usr/local/bin/fdfs_storaged /etc/fdfs/storage.conf 
+	data path: /usr/tools/data/fastdfs, mkdir sub dir...
+	mkdir data path: 00 ...
+	mkdir data path: 01 ...
+	。。。。
+	mkdir data path: FF ...
+	data path: /usr/tools/data/fastdfs, mkdir sub dir done.
+	[root@192 fdfs]#
+	至此fdfs_storaged启动完毕。
+	注意：如果启动fdfs_storaged时一直处于僵死状态，可查看/home/fdfs_data/storage/data/logs/storage.log检查错误日志定位错误
+	
+	查看fdfs_storaged是否启动成功：
+	[root@192 fdfs]# ps -ef | grep fdfs_storaged
+	root     20904  4712  0 23:33 pts/1    00:00:00 /usr/local/bin/fdfs_storaged /etc/fdfs/storage.conf
+	root     20908 19040  0 23:34 pts/2    00:00:00 grep fdfs_storaged
+	输出上面内容，说明启动成功。’
+
+	测试：
+	fdfs_trackerd和fdfs_storaged服务启动成功后，即可通过fdfs_test进行测试，测试上传/usr/tools/paysys.jpg文件，
+	[root@192 fdfs]# /usr/local/bin/fdfs_test /etc/fdfs/client.conf upload /usr/tools/paysys.jpg 
+	This is FastDFS client test program v4.06
+	Copyright (C) 2008, Happy Fish / YuQing
+	FastDFS may be copied only under the terms of the GNU General
+	Public License V3, which may be found in the FastDFS source kit.
+	Please visit the FastDFS Home Page http://www.csource.org/ 
+	for more detail.
+	[2016-08-10 23:49:37] DEBUG - base_path=/usr/tools/data/fastdfs, connect_timeout=30, network_timeout=60, tracker_server_count=1, anti_steal_token=0, anti_steal_secret_key length=0, use_connection_pool=0, g_connection_pool_max_idle_time=3600s, use_storage_id=0, storage server id count: 0
+	tracker_query_storage_store_list_without_group: 
+		server 1. group_name=, ip_addr=192.168.0.150, port=23000
+	group_name=group1, ip_addr=192.168.0.150, port=23000
+	storage_upload_by_filename
+	group_name=group1, remote_filename=M00/00/00/wKgAl1erTRGAcp8MAAjVftix7WI572.jpg
+	source ip address: 192.168.0.150
+	file timestamp=2016-08-10 23:49:37
+	file size=578942
+	file crc32=3635539298
+	file url: http://192.168.0.150:8080/group1/M00/00/00/wKgAl1erTRGAcp8MAAjVftix7WI572.jpg
+	storage_upload_slave_by_filename
+	group_name=group1, remote_filename=M00/00/00/wKgAl1erTRGAcp8MAAjVftix7WI572_big.jpg
+	source ip address: 192.168.0.150
+	file timestamp=2016-08-10 23:49:37
+	file size=578942
+	file crc32=3635539298
+	file url: http://192.168.0.150:8080/group1/M00/00/00/wKgAl1erTRGAcp8MAAjVftix7WI572_big.jpg
+	[root@192 fdfs]
+	文件上传成功，测试完成，以上就是上次后返回的上传的文件在fastdfs服务中的信息。
+
+四、安装、配置 Nignx 和 nginx第三方模块fastdfs-nginx-module
+
+	4.1、下载
+	1) Nginx
+	下载地址：http://nginx.org/en/download.html
+	建议下载最新版本（我使用的是nginx-1.4.2.tar.gz）
+
+	2) 下载 fastdfs-nginx-module模块
+	https://code.google.com/archive/p/fastdfs-nginx-module/downloads
+	我使用的是fastdfs-nginx-module_v1.15.tar.gz
+        
+        3）下载pcre库
+        Nginx 的 Rewrite模块的正则表达式依赖库：pcre；
+        pcre库简称：Perl兼容正则表达式
+        下载地址：http://www.pcre.org
+        下载版本：pcre-8.35.tar.gz
+
+	4.2、安装 nginx 和 fastdfs-nginx-module 
+            注意：若在安装nginx过程中，在执行configure步骤后出现错误提示需要pcre，则安装pcre库后在安装nginx，若在nginx的执行configure步骤后未出现任何错误，则不用自己安装pcre（pcre 安装步骤见 4.2.1）
+	授予执行权限：
+	[root@192 tools]# chmod 755 nginx-1.4.2.tar.gz
+	[root@192 tools]# chmod 755 fastdfs-nginx-module_v1.15.tar.gz
+	解压：
+	[root@192 tools]# tar -zxvf nginx-1.4.2.tar.gz
+	[root@192 tools]# tar -zxvf fastdfs-nginx-module_v1.15.tar.gz
+	进入nginx-1.4.2目录：
+	[root@192 tools]# cd nginx-1.4.2
+	编译安装nginx并同时指定安装fastdfs-nginx-module模块：
+	[root@192 nginx-1.4.2]# ./configure --prefix=/usr/local/nginx --add-module=/usr/tools/fastdfs-nginx-module/src/
+	[root@192 nginx-1.4.2]# make
+	[root@192 nginx-1.4.2]# make install
+        注意：
+                 如果在 执行 configure 后提示下面错误，则说明需要安装pcre库
+                ./configure: error: the HTTP rewrite module requires the PCRE library
+                解决办法：见下面 4.2.1
+        
+        4.2.1、若在安装 nginx 执行 configure 步骤后出现错误：./configure: error: the HTTP rewrite module requires the PCRE library（说明需要安装PCRE库），则安装 pcre 库既是，安装 pcre 库后再安装nginx；
+        安装 pcre-8.35：
+        授予执行权限 并 解压：
+	[root@192 tools]# chmod 755 pcre-8.35.tar.gz
+	[root@192 tools]# tar -zxvf pcre-8.35.tar.gz
+        [root@192 tools]# cd pcre-8.35
+        [root@192 pcre-8.35]# ./configure
+        [root@192 pcre-8.35]# make
+        [root@192 pcre-8.35]# make install
+        pcre 默认安装 到了 /usr/local/lib 下；
+        安装完成后可以查看安装情况：
+        [root@192 pcre-8.35]# ls -l /usr/local/lib/libpcre.so
+        lrwxrwxrwx 1 root root 16 08-14 19:43 /usr/local/lib/libpcre.so -> libpcre.so.1.2.3
+        注意：由于默认安装到了 /usr/local/lib 目录下面，故需要建立 /usr/local/lib/libpcre.so.1 到 /usr/lib/libpcre.so.1 的软连接，如下：
+        [root@192 conf]# ln -s /usr/local/lib/libpcre.so.1 /usr/lib/libpcre.so.1
+        至此，pcre 库安装完毕，接下来再装 nginx 就不会出问题了。
+
+	4.3、修改fastdfs-nginx-module的mod_fastdfs.conf配置
+	将nginx第三方模块fastdfs-nginx-module的mod_fastdfs.conf配置文件拷贝到/etc/fdfs目录下
+	[root@192 nginx-1.4.2]# cp /usr/tools/fastdfs-nginx-module/src/mod_fastdfs.conf /etc/fdfs/
+	[root@192 nginx-1.4.2]# cd /etc/fdfs/
+	[root@192 fdfs]# vim mod_fastdfs.conf
+	base_path=/usr/tools/data/fastdfs		#存储日志文件路径
+	tracker_server=192.168.0.152:22122		#tracker服务地址
+	store_path0=/usr/tools/data/fastdfs		#上传的数据存储路径，与storage.conf中的保持一致
+        url_have_group_name=false				#上传文件后返回的浏览地址是否含存储节点所属组名（true则url中含组名，保持默认false即可）
+	修改mod_fastdfs.conf配置完毕，按esc，输入:wq保存修改。
+	
+	4.4、配置nginx配置
+	进入nginx目录
+	[root@192 fdfs]# cd /usr/local/nginx/conf/
+	[root@192 conf]# vim nginx.conf
+	在nginx.conf配置文件中的server配置中加入如下配置（在vim浏览模式下使用yny可进行快速复制多行，n表示行数）
+	location /M00 {
+                root   /usr/tools/data/fastdfs/data;
+		ngx_fastdfs_module;
+	}
+	修改配置完毕，按esc，输入:wq保存修改。
+	测试nginx，启动nginx:
+	[root@192 conf]# /usr/local/nginx/sbin/nginx
+	ngx_http_fastdfs_set pid=12767
+	检查是否启动：
+	[root@192 conf]# ps -ef | grep nginx
+	root     12768     1  0 02:02 ?        00:00:00 nginx: master process /usr/local/nginx/sbin/nginx
+	nobody   12769 12768  0 02:02 ?        00:00:00 nginx: worker process      
+	root     12792  5598  0 02:04 pts/5    00:00:00 grep nginx
+	输出上面信息说明启动成功。
+	在浏览器中输入机器地址（默认访问80端口）：http://192.168.0.150/ 发现会返回一个nginx的欢迎页面，说明一切OK。
+	
+	4.5、访问之前上传到fastdfs服务中的图片文件：
+	之前通过命令下面命令上传了 /usr/tools/paysys.jpg 文件到fastdfs服务上，
+	[root@192 fdfs]# /usr/local/bin/fdfs_test /etc/fdfs/client.conf upload /usr/tools/paysys.jpg
+	并且返回了上传到fastdfs服务器后该文件的远程文件名、远程浏览地址和fastdfs服务器地址等信息，如下：
+	group_name=group1, ip_addr=192.168.0.150, port=23000
+	storage_upload_by_filename
+	group_name=group1, remote_filename=M00/00/00/wKgAl1erTRGAcp8MAAjVftix7WI572.jpg
+	source ip address: 192.168.0.150
+	file timestamp=2016-08-10 23:49:37
+	file size=578942
+	file crc32=3635539298
+	file url: http://192.168.0.150:8080/group1/M00/00/00/wKgAl1erTRGAcp8MAAjVftix7WI572.jpg
+	如此，我们用该地址在浏览器中访问：http://192.168.0.150/M00/00/00/wKgAl1erTRGAcp8MAAjVftix7WI572.jpg ，发现能浏览该图片，说明此时fastdfs 和 web服务器 nginx 已经正常工作了。
+
+
+五、管理nginx服务
+	启动：
+	/usr/local/nginx/sbin/nginx
+	停止
+	/usr/local/nginx/sbin/nginx -s stop
+	重启
+	/usr/local/nginx/sbin/nginx -s reload
+	查看状态
+	ps -ef | grep nginx
+	或
+	netstat -autlp| grep nginx
+	直接杀死nginx
+	pkill -9 nginx
+	修改配置后直接使用信号平滑的重读配置文件，不用重启nignx
+	kill -HUP `cat /usr/local/nginx/log/nginx.pid`
+	
+
+六、管理fastdfs服务
+	（1）启动：
+	/usr/local/bin/fdfs_trackerd /etc/fdfs/tracker.conf
+	/usr/local/bin/fdfs_storaged /etc/fdfs/storage.conf
+	
+	（2）
+	文件上传命令： 
+	fdfs_upload_file <config_file>
+	文件上传测试命令：
+	fdfs_test <config_file> <operation>，operation: upload, download, getmeta, setmeta, delete and query_servers
+	如：
+	[root@192 fdfs]# /usr/local/bin/fdfs_test /etc/fdfs/client.conf upload /usr/tools/paysys.jpg 	
+
+	（3）停止
+	直接kill即可让server进程正常退出，可以使用killall命令，例如：
+	killall fdfs_trackerd
+	killall fdfs_storaged
+	也可以使用FastDFS自带的stop.sh脚本，如：
+	/usr/local/bin/stop.sh  /usr/local/bin/fdfs_storaged /etc/fdfs/storage.conf
+	stop.sh只会停止命令行（包括参数）完全相同的进程。
+	千万不要使用-9参数强杀，否则可能会导致binlog数据丢失的问题。
+
+七、Java 连接 FastDFS 服务器并操作
+	上面服务环境搭建好了，接下来直接上代码示例：
+	示例Github地址：https://github.com/lixin901230/fastdfs_demo.git
