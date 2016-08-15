@@ -2,7 +2,8 @@
         红帽子企业发型版 5.4（RHEL_5.4 i386），提供个连接：https://yunpan.cn/c6TYK7j3WpEca  访问密码 f0cf
         下面环境搭建所需的FastDFS及Nginx环境：https://yunpan.cn/c6TvJ982fCVu2  访问密码 1e8c，建议根据提供的官方网址自己去下载。
 
-一、首先安装libevent库
+一、首先安装libevent库（我下载的FastDFS版本是4.06，需要安装libevent依赖库）
+        注意：貌似从 FastDFS_v5.x 版本开始依赖 libfastcommon 库 https://github.com/happyfish100/libfastcommon
 	因为FastDFS安装时对libevent的版本有一定要求。注意先查看是否已安装，如果已安装且版本低于1.3，则卸载重装。
 	1、查看机器是否安装有libevent
 	[root@192 ~]# rpm -qa | grep libevent
@@ -297,8 +298,8 @@
 	file size=578942
 	file crc32=3635539298
 	file url: http://192.168.0.150:8080/group1/M00/00/00/wKgAl1erTRGAcp8MAAjVftix7WI572.jpg
-	如此，我们用该地址在浏览器中访问：http://192.168.0.150/M00/00/00/wKgAl1erTRGAcp8MAAjVftix7WI572.jpg ，发现能浏览该图片，说明此时fastdfs 和 web服务器 nginx 已经正常工作了。
-
+	如此，上面配置了nginx后，我们用该地址在浏览器中就可以访问该图片了（注意访问端口为配置nginx虚拟主机配置中监听的端口，我的是默认的80端口），
+            访问地址：http://192.168.0.150/M00/00/00/wKgAl1erTRGAcp8MAAjVftix7WI572.jpg 。
 
 五、管理nginx服务
 	启动：
