@@ -18,12 +18,13 @@ import com.lx.platform.org.csource.fastdfs.TrackerServer;
  * 调用FDFS提供的客户端接口操作FDFS服务文件上传等
  */
 public class FileManager {
-	private static Logger logger = Logger.getLogger(FileManager.class);
-
-	private static TrackerClient trackerClient;
-	private static TrackerServer trackerServer;
-	private static StorageServer storageServer;
-	private static StorageClient storageClient;
+	
+	private static Logger logger  = Logger.getLogger(FileManager.class);
+	  
+	private static TrackerClient  trackerClient;
+	private static TrackerServer  trackerServer;
+	private static StorageServer  storageServer;
+	private static StorageClient  storageClient;
 
 	static { // Initialize Fast DFS Client configurations
 
