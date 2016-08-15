@@ -1,8 +1,6 @@
 package com.lx.platform.fastdfs;
 
 public class FastDFSFile {
-	  private static final long serialVersionUID = -996760121932438618L;
-	
 	  private String name;
 	  
 	  private byte[] content;

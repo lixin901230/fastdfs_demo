@@ -15,8 +15,6 @@ import com.lx.platform.org.csource.fastdfs.TrackerClient;
 import com.lx.platform.org.csource.fastdfs.TrackerServer;
 
 public class FileManager {
-	  private static final long serialVersionUID = 1L;
-
 	  private static Logger logger  = Logger.getLogger(FileManager.class);
 	  
 	  private static TrackerClient  trackerClient;
