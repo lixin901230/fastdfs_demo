@@ -9,6 +9,7 @@ import org.springframework.util.Assert;
 import com.lx.platform.org.csource.fastdfs.FileInfo;
 import com.lx.platform.org.csource.fastdfs.ServerInfo;
 import com.lx.platform.org.csource.fastdfs.StorageServer;
+import com.lx.platform.util.FileUtils;
 
 /**
  * 测试 上传文件到FastDFS、获取FastDFS服务中的文件信息 
@@ -43,6 +44,21 @@ public class TestFileManager {
 		System.out.println(fileAbsolutePath);
 		fis.close();
 	}
+	
+	@Test
+	public void testDownload() {
+		try {
+			byte[] bytes = FileManager.download("group1", "M00/00/00/wKgAl1erTRGAcp8MAAjVftix7WI572.jpg");
+			System.out.println(bytes);
+			
+			String filePath = FileUtils.getWebappPath()+"incoming/wKgAl1erTRGAcp8MAAjVftix7WI572.jpg";
+			FileUtils.download(bytes, filePath);
+			System.out.println("下载文件："+filePath);
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
 
 	/**
 	 * 测试根据存储节点服务器返回的 存储节点组名 和 远程文件名 获取fdfs服务中的
@@ -50,7 +66,7 @@ public class TestFileManager {
 	 */
 	@Test
 	public void getFile() throws Exception {
-		FileInfo file = FileManager.getFile("group1", "M00/00/00/wKgAbFeiIv-AcGiBAAMhq9w8VNM100.jpg");
+		FileInfo file = FileManager.getFile("group1", "M00/00/00/wKgAl1erTRGAcp8MAAjVftix7WI572.jpg");
 		Assert.notNull(file);
 		String sourceIpAddr = file.getSourceIpAddr();
 		long size = file.getFileSize();

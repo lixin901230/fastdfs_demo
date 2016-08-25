@@ -4,7 +4,7 @@ public class FileManagerConfig {
 
 	public static final String FILE_DEFAULT_WIDTH = "120";
 	public static final String FILE_DEFAULT_HEIGHT = "120";
-	public static final String FILE_DEFAULT_AUTHOR = "Diandi";
+	public static final String FILE_DEFAULT_AUTHOR = "lx";
 
 	public static final String PROTOCOL = "http://";
 	public static final String SEPARATOR = "/";
