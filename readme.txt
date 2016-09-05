@@ -20,7 +20,6 @@ FastDFS简介： （http://blog.chinaunix.net/uid-20196318-id-4058561.html）
 　　	1. client询问tracker上传到的storage，不需要附加参数；
 　　	2. tracker返回一台可用的storage；
 　　	3. client直接和storage通讯完成文件上传。
-　　	FastDFS file download
 
 下载文件交互过程：
 　　	1. client询问tracker下载文件的storage，参数为文件标识（卷名和文件名）；
