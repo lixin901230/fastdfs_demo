@@ -87,7 +87,7 @@ public class FastDFSFileManager {
 			// 上传文件
 			String[] uploadResults = storageClient.upload_file(file.getContent(), file.getExt(), meta_list);
 			
-			// 处理返回结果
+			// 处理上传文件返回的文件信息
 			if (uploadResults != null) {
 				
 				String groupName = uploadResults[0];
