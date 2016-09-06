@@ -49,8 +49,8 @@ public class FastDFSFileManager {
 	
 	/**
 	 * 得到文件附加属性名称-值对数组
-	 * @param nameValuePairMap	文件附加属性名称值对Map集合
-	 * @return NameValuePair[]
+	 * @param nameValuePairMap	文件附加属性名称-值对Map集合
+	 * @return NameValuePair[]	文件附加属性名称-值对对象数组
 	 */
 	public static NameValuePair[] getNameValuePair(Map<String, String> nameValuePairMap) throws Exception {
 		
@@ -125,8 +125,13 @@ public class FastDFSFileManager {
 		try {
 			// 获取文件附加属性
 			NameValuePair[] meta_list = getNameValuePair(file.getNameValuePairMap());
-		
-			storageClient.upload_appender_file(file.getContent(), file.getExt(), meta_list);
+			
+			String[] uploadResults = storageClient.upload_appender_file(file.getContent(), file.getExt(), meta_list);
+			
+			if(uploadResults != null) {
+				
+			}
+			
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
