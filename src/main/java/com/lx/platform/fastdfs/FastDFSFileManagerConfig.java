@@ -1,10 +1,6 @@
 package com.lx.platform.fastdfs;
 
-public class FileManagerConfig {
-
-	public static final String FILE_DEFAULT_WIDTH = "120";
-	public static final String FILE_DEFAULT_HEIGHT = "120";
-	public static final String FILE_DEFAULT_AUTHOR = "lx";
+public class FastDFSFileManagerConfig {
 
 	public static final String PROTOCOL = "http://";
 	public static final String SEPARATOR = "/";

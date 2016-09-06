@@ -2,6 +2,8 @@ package com.lx.platform.fastdfs;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import org.junit.Test;
 import org.springframework.util.Assert;
@@ -14,7 +16,7 @@ import com.lx.platform.util.FileUtils;
 /**
  * 测试 上传文件到FastDFS、获取FastDFS服务中的文件信息 
  */
-public class TestFileManager {
+public class TestFastDFSFileManager {
 	
 	/**
 	 * 上传文件到fdfs存储节点服务器中，并返回存储节点组名 和 远程文件名称
@@ -25,7 +27,7 @@ public class TestFileManager {
 		
 		String filePath = "D:\\Workspaces\\eclipse-jee-luna-SR2\\workspace1\\fastdfs_demo\\src\\main\\webapp\\incoming\\美女.jpg";;
 		File content = new File(filePath);
-
+		
 		FileInputStream fis = new FileInputStream(content);
 		byte[] file_buff = null;
 		if (fis != null) {
@@ -34,9 +36,15 @@ public class TestFileManager {
 			fis.read(file_buff);
 		}
 		
-		FastDFSFile file = new FastDFSFile("美女", file_buff, "jpg");
+		// 文件附加属性
+		Map<String, String> fileAttachAttrMap = new LinkedHashMap<String, String>();
+		fileAttachAttrMap.put("width", "1400");
+		fileAttachAttrMap.put("height", "900");
+		fileAttachAttrMap.put("author", "lx");
+		
+		FastDFSFile file = new FastDFSFile("美女", file_buff, "jpg", fileAttachAttrMap);
 
-		String fileAbsolutePath = FileManager.upload(file);
+		String fileAbsolutePath = FastDFSFileManager.upload(file);
 		/**
 		 * 返回地址：http://192.168.0.108:8080/group1/M00/00/00/wKgAbFeiIv-AcGiBAAMhq9w8VNM100.jpg，
 		 * 由于使用nginx监听80端口，故根据地址：http://192.168.0.108/group1/M00/00/00/wKgAbFeiIv-AcGiBAAMhq9w8VNM100.jpg 即可访问到FDFS上的文件
@@ -48,12 +56,13 @@ public class TestFileManager {
 	@Test
 	public void testDownload() {
 		try {
-			byte[] bytes = FileManager.download("group1", "M00/00/00/wKgAl1erTRGAcp8MAAjVftix7WI572.jpg");
-			System.out.println(bytes);
+			String fileSavePath = FileUtils.getWebappPath()+"incoming/wKgAl1erTRGAcp8MAAjVftix7WI572.jpg";
+
+			// 获取文件二进制字节码
+			byte[] bytes = FastDFSFileManager.download("group1", "M00/00/00/wKgAl1erTRGAcp8MAAjVftix7WI572.jpg");
+			FileUtils.download(bytes, fileSavePath);
 			
-			String filePath = FileUtils.getWebappPath()+"incoming/wKgAl1erTRGAcp8MAAjVftix7WI572.jpg";
-			FileUtils.download(bytes, filePath);
-			System.out.println("下载文件："+filePath);
+			System.out.println("下载文件："+ fileSavePath);
 			
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -66,7 +75,7 @@ public class TestFileManager {
 	 */
 	@Test
 	public void getFile() throws Exception {
-		FileInfo file = FileManager.getFile("group1", "M00/00/00/wKgAl1erTRGAcp8MAAjVftix7WI572.jpg");
+		FileInfo file = FastDFSFileManager.getFileInfo("group1", "M00/00/00/wKgAl1erTRGAcp8MAAjVftix7WI572.jpg");
 		Assert.notNull(file);
 		String sourceIpAddr = file.getSourceIpAddr();
 		long size = file.getFileSize();
@@ -80,7 +89,7 @@ public class TestFileManager {
 	 */
 	@Test
 	public void getStorageServer() throws Exception {
-		StorageServer[] ss = FileManager.getStoreStorages("group1");
+		StorageServer[] ss = FastDFSFileManager.getStoreStorages("group1");
 		Assert.notNull(ss);
 
 		for (int k = 0; k < ss.length; k++) {
@@ -95,7 +104,7 @@ public class TestFileManager {
 
 	@Test
 	public void getFetchStorages() throws Exception {
-		ServerInfo[] servers = FileManager.getFetchStorages("group1",
+		ServerInfo[] servers = FastDFSFileManager.getFetchStorages("group1",
 				"M00/00/00/wKgBm1N1-CiANRLmAABygPyzdlw073.jpg");
 		Assert.notNull(servers);
 
