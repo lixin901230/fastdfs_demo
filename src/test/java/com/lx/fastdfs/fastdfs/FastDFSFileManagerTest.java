@@ -5,6 +5,7 @@ import java.io.FileInputStream;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.csource.common.NameValuePair;
 import org.csource.fastdfs.FileInfo;
 import org.csource.fastdfs.ServerInfo;
 import org.csource.fastdfs.StorageServer;
@@ -53,13 +54,48 @@ public class FastDFSFileManagerTest {
 		fis.close();
 	}
 	
+	/**
+	 * 测试断点续传
+	 */
+	@Test
+	public void testUploadAppend() {
+		
+		String localFilePath = "C:\\Users\\Administrator\\Desktop\\lucene-5.4.0.zip";
+		String fileId = "";
+		fileId = "group1/M00/00/00/wKgAllfVgn-EW1h9AAAAAAAAAAA319.zip";
+		String url = FastDFSFileManager.uploadAppend(localFilePath, fileId, new NameValuePair[]{});
+		System.out.println(url);
+	}
+	
+	/**
+	 * 测试下载
+	 */
+	@Test
+	public void testDownload2() {
+		try {
+			String fileSavePath = FileUtils.getWebappPath()+"incoming/wKgAllfVgn-EW1h9AAAAAAAAAAA319.zip";
+			
+			// 获取文件二进制字节码
+			byte[] bytes = FastDFSFileManager.download("group1", "M00/00/00/wKgAllfVgn-EW1h9AAAAAAAAAAA319.zip");
+			FileUtils.download(bytes, fileSavePath);
+			
+			System.out.println("下载文件："+ fileSavePath);
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
+	/**
+	 * 测试下载
+	 */
 	@Test
 	public void testDownload() {
 		try {
-			String fileSavePath = FileUtils.getWebappPath()+"incoming/wKgAl1erTRGAcp8MAAjVftix7WI572.jpg";
+			String fileSavePath = FileUtils.getWebappPath()+"incoming/wKgAllfVdD2AYp5tAAMhq9w8VNM087.jpg";
 
 			// 获取文件二进制字节码
-			byte[] bytes = FastDFSFileManager.download("group1", "M00/00/00/wKgAl1erTRGAcp8MAAjVftix7WI572.jpg");
+			byte[] bytes = FastDFSFileManager.download("group1", "M00/00/00/wKgAllfVdD2AYp5tAAMhq9w8VNM087.jpg");
 			FileUtils.download(bytes, fileSavePath);
 			
 			System.out.println("下载文件："+ fileSavePath);
@@ -75,12 +111,12 @@ public class FastDFSFileManagerTest {
 	 */
 	@Test
 	public void getFile() throws Exception {
-		FileInfo file = FastDFSFileManager.getFileInfo("group1", "M00/00/00/wKgAl1erTRGAcp8MAAjVftix7WI572.jpg");
+		FileInfo file = FastDFSFileManager.getFileInfo("group1", "M00/00/00/wKgAllfVdD2AYp5tAAMhq9w8VNM087.jpg");
 		Assert.notNull(file);
 		String sourceIpAddr = file.getSourceIpAddr();
 		long size = file.getFileSize();
 		System.out.println("ip:" + sourceIpAddr + ",size:" + size);
-		System.out.println("文件访问地址："+"http://"+sourceIpAddr+"/group1/M00/00/00/wKgAbFeiIv-AcGiBAAMhq9w8VNM100.jpg");
+		System.out.println("文件访问地址："+"http://"+sourceIpAddr+"/group1/M00/00/00/wKgAllfVdD2AYp5tAAMhq9w8VNM087.jpg");
 	}
 
 	/**
@@ -93,7 +129,7 @@ public class FastDFSFileManagerTest {
 		Assert.notNull(ss);
 
 		for (int k = 0; k < ss.length; k++) {
-			System.err.println(k
+			System.out.println(k
 					+ 1
 					+ ". "
 					+ ss[k].getInetSocketAddress().getAddress()
@@ -105,11 +141,11 @@ public class FastDFSFileManagerTest {
 	@Test
 	public void getFetchStorages() throws Exception {
 		ServerInfo[] servers = FastDFSFileManager.getFetchStorages("group1",
-				"M00/00/00/wKgBm1N1-CiANRLmAABygPyzdlw073.jpg");
+				"M00/00/00/wKgAllfVdD2AYp5tAAMhq9w8VNM087.jpg");
 		Assert.notNull(servers);
 
 		for (int k = 0; k < servers.length; k++) {
-			System.err.println(k + 1 + ". " + servers[k].getIpAddr() + ":"
+			System.out.println(k + 1 + ". " + servers[k].getIpAddr() + ":"
 					+ servers[k].getPort());
 		}
 	}

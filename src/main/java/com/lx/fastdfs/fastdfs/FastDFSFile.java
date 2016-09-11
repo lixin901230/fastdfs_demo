@@ -9,6 +9,9 @@ import java.util.Map;
  */
 public class FastDFSFile {
 	
+	// 文件id
+	private String fileId;
+	
 	// 文件名
 	private String name;
 	
@@ -20,21 +23,7 @@ public class FastDFSFile {
 	
 	// 文件附加属性键值对，例如图片高度、宽度、作者等等
 	private Map<String, String> nameValuePairMap = new LinkedHashMap<String, String>();
-	
-	/**
-	 * @param name	文件名
-	 * @param content	文件二进制内容	
-	 * @param ext	文件扩展名
-	 * @param nameValuePair	文件附加属性名称-值对集合
-	 */
-	public FastDFSFile(String name, byte[] content, String ext, Map<String, String> nameValuePair) {
-		super();
-		this.name = name;
-		this.content = content;
-		this.ext = ext;
-		this.nameValuePairMap = nameValuePair;
-	}
-	
+
 	/**
 	 * @param name	文件名
 	 * @param content	文件二进制内容	
@@ -45,6 +34,45 @@ public class FastDFSFile {
 		this.name = name;
 		this.content = content;
 		this.ext = ext;
+	}
+	
+	/**
+	 * @param name	文件名
+	 * @param content	文件二进制内容	
+	 * @param ext	文件扩展名
+	 * @param nameValuePairMap	文件附加属性名称-值对集合
+	 */
+	public FastDFSFile(String name, byte[] content, String ext, Map<String, String> nameValuePairMap) {
+		super();
+		this.name = name;
+		this.content = content;
+		this.ext = ext;
+		this.nameValuePairMap = nameValuePairMap;
+	}
+	
+	/**
+	 * @param fileId	文件id
+	 * @param name		文件名
+	 * @param content	文件二进制内容	
+	 * @param ext		文件扩展名
+	 * @param nameValuePairMap	文件附加属性名称-值对集合
+	 */
+	public FastDFSFile(String fileId, String name, byte[] content, String ext,
+			Map<String, String> nameValuePairMap) {
+		super();
+		this.fileId = fileId;
+		this.name = name;
+		this.content = content;
+		this.ext = ext;
+		this.nameValuePairMap = nameValuePairMap;
+	}
+	
+	public String getFileId() {
+		return fileId;
+	}
+
+	public void setFileId(String fileId) {
+		this.fileId = fileId;
 	}
 
 	public String getName() {
