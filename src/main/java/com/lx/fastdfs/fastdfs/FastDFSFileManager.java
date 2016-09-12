@@ -5,6 +5,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.text.DecimalFormat;
 import java.util.Map;
 
@@ -13,6 +14,7 @@ import org.apache.log4j.Logger;
 import org.csource.common.IniFileReader;
 import org.csource.common.NameValuePair;
 import org.csource.fastdfs.ClientGlobal;
+import org.csource.fastdfs.DownloadStream;
 import org.csource.fastdfs.FileInfo;
 import org.csource.fastdfs.ServerInfo;
 import org.csource.fastdfs.StorageClient;
@@ -20,6 +22,7 @@ import org.csource.fastdfs.StorageClient1;
 import org.csource.fastdfs.StorageServer;
 import org.csource.fastdfs.TrackerClient;
 import org.csource.fastdfs.TrackerServer;
+import org.csource.fastdfs.test.DownloadFileWriter;
 
 
 /**
@@ -34,10 +37,15 @@ public class FastDFSFileManager {
 	public static final String TRACKER_NGNIX_PORT = "8080";
 	public static final String CLIENT_CONFIG_FILE = "fdfs_client.conf";
 	
-	private static final int MIN_UPLOAD_BUFF_SIZE = 2;		// 最小上传缓冲区单位大小；1024的2倍
-	private static final int MAX_UPLOAD_BUFF_SIZE = 20;		// 最大上传缓冲区单位大小；1024的20倍
-	private static final int DEFAULT_UPLOAD_BUFF_SIZE = 5;	// 默认上传缓冲区单位大小；1024的5倍
-	private static int g_upload_buff_size_unit;				// 配置文件中配置的上传文件缓冲区大小单位
+	private static final int MIN_BUFF_SIZE = 2;			// 最小上传、下载缓冲区单位大小；1024的2倍
+	private static final int MAX_BUFF_SIZE = 20;		// 最大上传、下载缓冲区单位大小；1024的20倍
+	private static final int DEFAULT_BUFF_SIZE = 5;		// 默认上传、下载缓冲区单位大小；1024的5倍
+	private static int g_buff_size_unit;				// 配置文件中配置的上传、下载文件缓冲区大小单位
+	
+	private static int MIN_DOWNLOAD_FAIL_RETRY_NUM = 0;		// 下载失败时，最小重试次数
+	private static int MAX_DOWNLOAD_FAIL_RETRY_NUM = 10;	// 下载失败时，最大重试次数
+	private static int DEFAULT_DOWNLOAD_FAIL_RETRY_NUM = 5;	// 下载失败时，默认重试次数
+	private static int g_download_fail_retry_num;			// 下载失败时，默认重试次数
 	
 	private static TrackerClient  trackerClient;
 	private static TrackerServer  trackerServer;
@@ -76,11 +84,21 @@ public class FastDFSFileManager {
 	private static void getUploadBuffSizeUnit() throws FileNotFoundException, IOException {
 		
 		IniFileReader iniReader = new IniFileReader(fdfsClientConfPath);
-		g_upload_buff_size_unit = iniReader.getIntValue("upload_buff_size_unit", DEFAULT_UPLOAD_BUFF_SIZE);
-		if(g_upload_buff_size_unit < MIN_UPLOAD_BUFF_SIZE) {
-			g_upload_buff_size_unit = MIN_UPLOAD_BUFF_SIZE;
-		} else if(g_upload_buff_size_unit > MAX_UPLOAD_BUFF_SIZE) {
-			g_upload_buff_size_unit = MAX_UPLOAD_BUFF_SIZE;
+		
+		// 获取上传、下载缓冲区单位大小（用于乘以1024的整数倍倍数）
+		g_buff_size_unit = iniReader.getIntValue("buff_size_unit", DEFAULT_BUFF_SIZE);
+		if(g_buff_size_unit < MIN_BUFF_SIZE) {
+			g_buff_size_unit = MIN_BUFF_SIZE;
+		} else if(g_buff_size_unit > MAX_BUFF_SIZE) {
+			g_buff_size_unit = MAX_BUFF_SIZE;
+		}
+		
+		// 获取下载失败重试次数配置，未配置则启用默认配置
+		g_download_fail_retry_num = iniReader.getIntValue("download_fail_retry_num", DEFAULT_DOWNLOAD_FAIL_RETRY_NUM);
+		if(g_download_fail_retry_num < MIN_DOWNLOAD_FAIL_RETRY_NUM) {
+			g_download_fail_retry_num = MIN_DOWNLOAD_FAIL_RETRY_NUM;
+		} else if(g_download_fail_retry_num > MAX_DOWNLOAD_FAIL_RETRY_NUM) {
+			g_download_fail_retry_num = MAX_DOWNLOAD_FAIL_RETRY_NUM;
 		}
 	}
 	
@@ -216,21 +234,21 @@ public class FastDFSFileManager {
 			StorageServer storageServer = trackerClient.getFetchStorage(trackerServer, groupName, fileName);
 			StorageClient1 storageClient1 = new StorageClient1(trackerServer, storageServer);
 			
-			System.out.println(">>>>>>StorageServer："+storageServer.getInetSocketAddress().getHostName());
+			logger.info(">>>>>>StorageServer："+storageServer.getInetSocketAddress().getHostName());
 
 			FileInfo fileInfo = getFileInfo(storageClient1, fileId);
 			remoteFileSize = fileInfo.getFileSize();
 			
-			System.out.println(">>>>>>续传前服务器上已上传上去的文件大小："+remoteFileSize);
+			logger.info(">>>>>>续传前服务器上已上传上去的文件大小："+remoteFileSize);
 			
 			remoteFileSize= append_file(storageClient1, fileId, remoteFileSize, length, new FileInputStream(file));
 			
-			System.out.println(">>>>>>本次续传上传的文件大小："+remoteFileSize);
+			logger.info(">>>>>>本次续传上传的文件大小："+remoteFileSize);
 			
 			// 服务器上文件大小与本地文件大小一致，说明上传完成
 			if(remoteFileSize == length) {
 				String remoteFileUrl = FastDFSFileManager.PROTOCOL.concat(fileInfo.getSourceIpAddr()).concat("/").concat(fileId);
-				System.out.println("文件上传成功，远程文件访问地址："+remoteFileUrl);
+				logger.info("文件上传成功，远程文件访问地址："+remoteFileUrl);
 				return remoteFileUrl;
 			}
 			
@@ -257,14 +275,14 @@ public class FastDFSFileManager {
 		}
 
 		try {
-			byte[] buff = new byte[g_upload_buff_size_unit * 1024];
+			byte[] buff = new byte[g_buff_size_unit * 1024];
 			is.skip(skipSize);
 			while(skipSize <= length) {
 				
 				// 延时方便测试
 //				Thread.sleep(1000);
 				
-				int successFlag = -1;	// 0：成功
+				int result = -1;	// 0：成功
 				
 				int readEndPos = length - skipSize > buff.length ? buff.length : (int)(length - skipSize);	// 每次读取结束的位置
 				int readCount = is.read(buff, 0, readEndPos);
@@ -273,16 +291,15 @@ public class FastDFSFileManager {
 					break;
 				}
 				
-				
 				if(readCount > buff.length) {	// 读到结尾了，而且读取到内容未塞满缓冲区
 					byte[] smallByte = new byte[readCount];
 					System.arraycopy(buff, 0, smallByte, 0, readCount);
-					successFlag = storageClient1.append_file1(fileId, smallByte);
+					result = storageClient1.append_file1(fileId, smallByte);
 				} else {
-					successFlag = storageClient1.append_file1(fileId, buff);
+					result = storageClient1.append_file1(fileId, buff);
 				}
 				
-				if(successFlag != 0) {	// 若失败了，则返回下次续传时需跳过的字节数
+				if(result != 0) {	// 若失败了，则返回下次续传时需跳过的字节数
 					return skipSize;
 				}
 				skipSize += readCount;	// 本次分片上传成功，则更新续传开始需要跳过的字节数
@@ -296,7 +313,7 @@ public class FastDFSFileManager {
 	}
 	
 	/**
-	 * 下载文件，返回二进制文件字节码
+	 * 下载文件，返回二进制文件字节数组
 	 * @param groupName
 	 * @param remoteFileName
 	 * @return byte[] 文件内容字节数组
@@ -309,6 +326,130 @@ public class FastDFSFileManager {
 		}
 		return null;
 	}
+
+	/**
+	 * 断点下载（将文件内容写入到输出流中）
+	 * @param groupName			组名
+	 * @param remoteFileName	下载的文件的远程文件名
+	 * @param size		客户端已下载到本地的文件的大小（断点下载时将跳过已下载过的部分接着下载）
+	 * @param out		输出流（客户端下载时，可获取到客户端的输出流后，调用此接口直接将服务端的文件通过该输出流下载到客户端）
+	 * @return 0 success, return none zero errno if fail
+	 */
+	public static int downloadAppend(String groupName, String remoteFileName, int size, OutputStream out) {
+		int result = -1;
+		int reTryCount = 0;
+		while(result != 0 && reTryCount < 10) {	
+			//如果下载失败，继续下载，在这可以设置一定的规则（如:下载出现异常时，每间隔一段时间重试（间隔时长可配置化），超过重试次数后停止下载重试（重试次数可配置化））
+			try {
+				// 方式1：此处download_file方法中倒数第二个参数download_bytes设置为0，指下载时从size位置到整个文件结束位置
+				result = storageClient.download_file(groupName, remoteFileName, size, 0, new DownloadStream(out));
+				reTryCount++;	// 更新重试次数
+				
+			} catch (Exception e) {
+				e.printStackTrace();
+				logger.error("断点下载（将文件内容写入到输出流中）失败，6 秒后 准备重试第："+reTryCount+"次");
+				try {
+					Thread.sleep(6000);	// 如果遇到异常下载失败，则等1秒再重试（此处6秒间隔时长可进行配置化）
+				} catch (InterruptedException e1) {
+					e1.printStackTrace();
+				}
+			}
+		}
+		return result;
+	}
+	
+	/**
+	 * 大文件分段下载（将大文件按指定大小分割后进行多线程下载）
+	 * @param groupName			组名
+	 * @param remoteFileName	下载的文件的远程文件名
+	 * @param segmentSize		大文件切割成小文件分段下载时，切片分割成的小文件大小
+	 * @param localFilePath		下载时本地文件路径
+	 * @return 0 success, return none zero errno if fail
+	 */
+	public static int downloadBySegment(String groupName, String remoteFileName, int segmentSize, int size, String localFilePath) {
+		int result = -1;
+		int index = 1;
+		long writeCount = 0;
+		long fileSize = getFileInfo(groupName, remoteFileName).getFileSize();
+		while(writeCount < fileSize) {	
+			//如果下载失败，继续下载，在这可以设置一定的规则（如:下载出现异常时，每间隔一段时间重试（间隔时长可配置化），超过重试次数后停止下载重试（重试次数可配置化））
+			try {
+				// 生成分段下载每个分段的文件名（规则：在原文件名的前面加上序号）
+				String newLocalFilePath = localFilePath.substring(0,localFilePath.indexOf(groupName) + 1) 
+						+ index 
+						+ localFilePath.substring(localFilePath.indexOf(groupName) + 1);
+				result = storageClient.download_file(groupName, remoteFileName, size, segmentSize, 
+						new DownloadFileWriter(newLocalFilePath));
+
+				writeCount += segmentSize;
+				index ++;
+				
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+		return result;
+	}
+	
+	/**
+	 * 断点下载（根据本地文件路径直接写入文件）
+	 * @param groupName			组名
+	 * @param remoteFileName	下载的文件的远程文件名（groupName +"/"+ remoteFileName）
+	 * @param localFilePath		下载到上次未完成下载的文件在客户端本地存储的文件路径
+	 * @return 0 success, return none zero errno if fail
+	 */
+	public static int downloadAppend(String groupName, String remoteFileName, String localFilePath) {
+		int result = -1;
+		try {
+			File file = new File(localFilePath);
+			if(file.exists()) {
+				long size = file.length();
+				result = storageClient.download_file(groupName, remoteFileName, size, 0, localFilePath);
+			} else {
+				logger.error(">>>>>>本地断点下载文件"+localFilePath+"不能存在！");
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return result;
+	}
+
+	/**
+	 * 断点下载（根据本地文件路径直接写入文件）
+	 * @param groupName			组名
+	 * @param remoteFileName	下载的文件的远程文件名
+	 * @param size				客户端已下载到本地的文件的大小（断点下载时将跳过已下载过的部分接着下载）
+	 * @param localFilePath		下载到客户端本地的文件路径（上次未完成下载的文件在客户端本地存储的文件路径，本次断点下载后讲下载内容直接在此文件上继续追加）
+	 * @return 0 success, return none zero errno if fail
+	 */
+	public static int downloadAppend(String groupName, String remoteFileName, int size, String localFilePath) {
+		int result = -1;
+		try {
+			result = storageClient.download_file(groupName, remoteFileName, size, 0, new DownloadFileWriter(localFilePath));
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return result;
+	}
+	
+	/**
+	 * 删除文件
+	 * @param fileId	文件id（fileId = groupName +"/"+ fileName）
+	 * @return	0：成功；非0：失败
+	 */
+	public static int deleteFile(String fileId) {
+		int result = -1;
+		try {
+			TrackerServer trackerServer = trackerClient.getConnection();
+			StorageServer storageServer = trackerClient.getFetchStorage1(trackerServer, fileId);
+			StorageClient1 storageClient1 = new StorageClient1(trackerServer, storageServer);
+			result = storageClient1.delete_file1(fileId);
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return result;
+	}
 	
 	/**
 	 * 删除文件
@@ -317,13 +458,13 @@ public class FastDFSFileManager {
 	 * @return	0：成功；非0：失败
 	 */
 	public static int deleteFile(String groupName, String remoteFileName) {
-		int success = -1;
+		int result = -1;
 		try {
-			success = storageClient.delete_file(groupName, remoteFileName);
+			result = storageClient.delete_file(groupName, remoteFileName);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-		return success;
+		return result;
 	}
 	
 	/**
