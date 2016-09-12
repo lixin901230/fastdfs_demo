@@ -312,6 +312,25 @@ public class FastDFSFileManager {
 	
 	/**
 	 * 删除文件
+	 * @param fileId	文件id（fileId = groupName +"/"+ fileName）
+	 * @return	0：成功；非0：失败
+	 */
+	public static int deleteFile(String fileId) {
+		int success = -1;
+		try {
+			TrackerServer trackerServer = trackerClient.getConnection();
+			StorageServer storageServer = trackerClient.getFetchStorage1(trackerServer, fileId);
+			StorageClient1 storageClient1 = new StorageClient1(trackerServer, storageServer);
+			success = storageClient1.delete_file1(fileId);
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return success;
+	}
+	
+	/**
+	 * 删除文件
 	 * @param groupName		存储服务器所在的组名
 	 * @param remoteFileName	文件上传到存储服务器上后的文件名
 	 * @return	0：成功；非0：失败
