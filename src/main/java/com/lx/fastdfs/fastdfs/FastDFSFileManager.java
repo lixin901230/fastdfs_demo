@@ -359,39 +359,6 @@ public class FastDFSFileManager {
 	}
 	
 	/**
-	 * 大文件分段下载（将大文件按指定大小分割后进行多线程下载）
-	 * @param groupName			组名
-	 * @param remoteFileName	下载的文件的远程文件名
-	 * @param segmentSize		大文件切割成小文件分段下载时，切片分割成的小文件大小
-	 * @param localFilePath		下载时本地文件路径
-	 * @return 0 success, return none zero errno if fail
-	 */
-	public static int downloadBySegment(String groupName, String remoteFileName, int segmentSize, int size, String localFilePath) {
-		int result = -1;
-		int index = 1;
-		long writeCount = 0;
-		long fileSize = getFileInfo(groupName, remoteFileName).getFileSize();
-		while(writeCount < fileSize) {	
-			//如果下载失败，继续下载，在这可以设置一定的规则（如:下载出现异常时，每间隔一段时间重试（间隔时长可配置化），超过重试次数后停止下载重试（重试次数可配置化））
-			try {
-				// 生成分段下载每个分段的文件名（规则：在原文件名的前面加上序号）
-				String newLocalFilePath = localFilePath.substring(0,localFilePath.indexOf(groupName) + 1) 
-						+ index 
-						+ localFilePath.substring(localFilePath.indexOf(groupName) + 1);
-				result = storageClient.download_file(groupName, remoteFileName, size, segmentSize, 
-						new DownloadFileWriter(newLocalFilePath));
-
-				writeCount += segmentSize;
-				index ++;
-				
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
-		}
-		return result;
-	}
-	
-	/**
 	 * 断点下载（根据本地文件路径直接写入文件）
 	 * @param groupName			组名
 	 * @param remoteFileName	下载的文件的远程文件名（groupName +"/"+ remoteFileName）
@@ -413,7 +380,45 @@ public class FastDFSFileManager {
 		}
 		return result;
 	}
-
+	
+	/**
+	 * 大文件分段下载（将大文件按指定大小分割后进行多线程下载）
+	 * @param groupName			组名
+	 * @param remoteFileName	下载的文件的远程文件名
+	 * @param segmentSize		大文件切割成小文件分段下载时，切片分割成的小文件大小
+	 * @param localFilePath		下载时本地文件路径
+	 * @return 0 success, return none zero errno if fail
+	 */
+	public static int downloadBySegment(String groupName, String remoteFileName, int segmentSize, int size, String localFilePath) {
+		int result = -1;
+		int index = 1;
+		long writeCount = 0;
+		long fileSize = getFileInfo(groupName, remoteFileName).getFileSize();
+		while(writeCount < fileSize) {	
+			//如果下载失败，继续下载，在这可以设置一定的规则（如:下载出现异常时，每间隔一段时间重试（间隔时长可配置化），超过重试次数后停止下载重试（重试次数可配置化））
+			try {
+				
+				String pathPrefix = remoteFileName.substring(0, remoteFileName.indexOf(groupName) + groupName.length()+1);
+				String fileExtName = remoteFileName.substring(remoteFileName.lastIndexOf("."));
+				String fileName = remoteFileName.substring(remoteFileName.indexOf(groupName) + groupName.length()+1, remoteFileName.lastIndexOf("."));
+				
+				// 生成分段下载每个分段的文件名（规则：在原文件名的前面加上序号）
+				fileName = fileName.replaceAll("/", "_") +"-"+ index;
+				String newFilePath = pathPrefix + fileName + fileExtName;
+				
+				result = storageClient.download_file(groupName, remoteFileName, size, segmentSize, 
+						new DownloadFileWriter(newFilePath));
+				
+				writeCount += segmentSize;
+				index ++;
+				
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+		return result;
+	}
+	
 	/**
 	 * 断点下载（根据本地文件路径直接写入文件）
 	 * @param groupName			组名
