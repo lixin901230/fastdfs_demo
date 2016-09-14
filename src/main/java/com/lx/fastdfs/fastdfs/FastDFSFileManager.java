@@ -389,7 +389,9 @@ public class FastDFSFileManager {
 	 * @param localFilePath		下载时本地文件路径
 	 * @return 0 success, return none zero errno if fail
 	 */
-	public static int downloadBySegment(String groupName, String remoteFileName, int segmentSize, int size, String localFilePath) {
+	public static int downloadBySegment(String groupName, String remoteFileName, 
+			int segmentSize, int size, String localFilePath) {
+		
 		int result = -1;
 		int index = 1;
 		long writeCount = 0;
