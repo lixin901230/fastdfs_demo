@@ -2,6 +2,8 @@ package com.lx.fastdfs.fastdfs;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.OutputStream;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -21,6 +23,7 @@ public class FastDFSFileManagerTest {
 	
 	/**
 	 * 上传文件到fdfs存储节点服务器中，并返回存储节点组名 和 远程文件名称
+	 * 普通上传
 	 * @throws Exception
 	 */
 	@Test
@@ -53,6 +56,25 @@ public class FastDFSFileManagerTest {
 		System.out.println(fileAbsolutePath);
 		fis.close();
 	}
+
+	/**
+	 * 测试普通下载
+	 */
+	@Test
+	public void testDownload() {
+		try {
+			String fileSavePath = FileUtils.getWebappPath()+"incoming/wKgAllfVdD2AYp5tAAMhq9w8VNM087.jpg";
+
+			// 获取文件二进制字节码
+			byte[] bytes = FastDFSFileManager.download("group1", "M00/00/00/wKgAllfVdD2AYp5tAAMhq9w8VNM087.jpg");
+			FileUtils.download(bytes, fileSavePath);
+			
+			System.out.println("下载文件："+ fileSavePath);
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
 	
 	/**
 	 * 测试断点续传
@@ -68,35 +90,60 @@ public class FastDFSFileManagerTest {
 	}
 	
 	/**
-	 * 测试下载
+	 * 测试断点下载
 	 */
 	@Test
-	public void testDownload2() {
+	public void testDownloadAppend() {
 		try {
 			String fileSavePath = FileUtils.getWebappPath()+"incoming/wKgAllfVgn-EW1h9AAAAAAAAAAA319.zip";
 			
-			// 获取文件二进制字节码
-			byte[] bytes = FastDFSFileManager.download("group1", "M00/00/00/wKgAllfVgn-EW1h9AAAAAAAAAAA319.zip");
-			FileUtils.download(bytes, fileSavePath);
+			String groupName = "group1";
+			String remoteFileName = "M00/00/00/wKgAllfVgn-EW1h9AAAAAAAAAAA319.zip";
 			
-			System.out.println("下载文件："+ fileSavePath);
+			// 普通下载：获取文件二进制字节码
+			/*byte[] bytes = FastDFSFileManager.download(groupName, remoteFileName);
+			FileUtils.download(bytes, fileSavePath);*/
 			
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-	}
-	
-	/**
-	 * 测试下载
-	 */
-	@Test
-	public void testDownload() {
-		try {
-			String fileSavePath = FileUtils.getWebappPath()+"incoming/wKgAllfVdD2AYp5tAAMhq9w8VNM087.jpg";
-
-			// 获取文件二进制字节码
-			byte[] bytes = FastDFSFileManager.download("group1", "M00/00/00/wKgAllfVdD2AYp5tAAMhq9w8VNM087.jpg");
-			FileUtils.download(bytes, fileSavePath);
+			// 断点下载1：
+			/*OutputStream out = new FileOutputStream(fileSavePath);
+			int state = FastDFSFileManager.downloadAppend(groupName, remoteFileName, 0, out);
+			if(state == 0) {
+				System.out.println("下载完毕");
+			}*/
+			
+			// 断点下载2：？？？？
+			/*int state2 = FastDFSFileManager.downloadAppend(groupName, remoteFileName, fileSavePath);
+			if(state2 == 0) {
+				System.out.println("下载完毕");
+			}*/
+			
+			// 断点下载3：
+			/*long length = 0;	//默认已经下载到本地的文件大小
+			File downloadedFile = new File(fileSavePath);
+			if(downloadedFile.exists()) {	// 如果本地已经下载过该文件，但未下完，则获取该文件大小，并在本次下载时跳过已下载部分接着下载
+				length = downloadedFile.length();
+			}
+			int state3 = FastDFSFileManager.downloadAppend(groupName, remoteFileName, length, fileSavePath);
+			if(state3 == 0) {
+				System.out.println("下载完毕");
+			}*/
+			
+			// 分段下载4：
+			// 本次分段测试将一个文件分成两个文件进行下载
+			// 1）第1个分段文件大小：0~40960
+			long startOffset = 0;		//多线程分段下载时每个片段的开始位置
+			long segmentSize = 20;	//切片分段下载时每个分段文件的大小，单位M，1：设置为一个正整数表示下载的每个分片文件大小为该值，2：设置为0表示从开始位置一直到文件结尾
+			int state4 = FastDFSFileManager.downloadBySegment(groupName, remoteFileName, segmentSize, startOffset, fileSavePath,1);
+			if(state4 == 0) {
+				System.out.println("下载完毕");
+			}
+			// 2）第2个分段文件大小：40960~整个文件大小
+			startOffset = 20 * 1024 * 1024;		//多线程分段下载时每个片段的开始位置
+			segmentSize = 0;		//切片分段下载时每个分段文件的大小，1：设置为一个正整数表示下载的每个分片文件大小为该值，2：设置为0表示从开始位置一直到文件结尾
+			int state5 = FastDFSFileManager.downloadBySegment(groupName, remoteFileName, segmentSize, startOffset, fileSavePath,2);
+			if(state5 == 0) {
+				System.out.println("下载完毕");
+			}
 			
 			System.out.println("下载文件："+ fileSavePath);
 			

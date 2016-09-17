@@ -42,9 +42,9 @@ public class FastDFSFileManager {
 	private static final int DEFAULT_BUFF_SIZE = 5;		// 默认上传、下载缓冲区单位大小；1024的5倍
 	private static int g_buff_size_unit;				// 配置文件中配置的上传、下载文件缓冲区大小单位
 	
-	private static int MIN_DOWNLOAD_FAIL_RETRY_NUM = 0;		// 下载失败时，最小重试次数
-	private static int MAX_DOWNLOAD_FAIL_RETRY_NUM = 10;	// 下载失败时，最大重试次数
-	private static int DEFAULT_DOWNLOAD_FAIL_RETRY_NUM = 5;	// 下载失败时，默认重试次数
+	private static final int MIN_DOWNLOAD_FAIL_RETRY_NUM = 0;		// 下载失败时，最小重试次数
+	private static final int MAX_DOWNLOAD_FAIL_RETRY_NUM = 10;	// 下载失败时，最大重试次数
+	private static final int DEFAULT_DOWNLOAD_FAIL_RETRY_NUM = 5;	// 下载失败时，默认重试次数
 	private static int g_download_fail_retry_num;			// 下载失败时，默认重试次数
 	
 	private static TrackerClient  trackerClient;
@@ -331,14 +331,14 @@ public class FastDFSFileManager {
 	 * 断点下载（将文件内容写入到输出流中）
 	 * @param groupName			组名
 	 * @param remoteFileName	下载的文件的远程文件名
-	 * @param size		客户端已下载到本地的文件的大小（断点下载时将跳过已下载过的部分接着下载）
+	 * @param size		文件下载时的开始位置，客户端已下载到本地的文件的大小（断点下载时将跳过已下载过的部分接着下载）
 	 * @param out		输出流（客户端下载时，可获取到客户端的输出流后，调用此接口直接将服务端的文件通过该输出流下载到客户端）
 	 * @return 0 success, return none zero errno if fail
 	 */
-	public static int downloadAppend(String groupName, String remoteFileName, int size, OutputStream out) {
+	public static int downloadAppend(String groupName, String remoteFileName, long size, OutputStream out) {
 		int result = -1;
 		int reTryCount = 0;
-		while(result != 0 && reTryCount < 10) {	
+		while(result != 0 && reTryCount < g_download_fail_retry_num) {
 			//如果下载失败，继续下载，在这可以设置一定的规则（如:下载出现异常时，每间隔一段时间重试（间隔时长可配置化），超过重试次数后停止下载重试（重试次数可配置化））
 			try {
 				// 方式1：此处download_file方法中倒数第二个参数download_bytes设置为0，指下载时从size位置到整个文件结束位置
@@ -349,9 +349,17 @@ public class FastDFSFileManager {
 				e.printStackTrace();
 				logger.error("断点下载（将文件内容写入到输出流中）失败，6 秒后 准备重试第："+reTryCount+"次");
 				try {
-					Thread.sleep(6000);	// 如果遇到异常下载失败，则等1秒再重试（此处6秒间隔时长可进行配置化）
+					Thread.sleep(6000);	// 如果遇到异常下载失败，则等6秒再重试（此处6秒间隔时长可进行配置化）
 				} catch (InterruptedException e1) {
 					e1.printStackTrace();
+				}
+			} finally {
+				if(out != null) {
+					try {
+						out.close();
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
 				}
 			}
 		}
@@ -380,62 +388,73 @@ public class FastDFSFileManager {
 		}
 		return result;
 	}
-	
-	/**
-	 * 大文件分段下载（将大文件按指定大小分割后进行多线程下载）
-	 * @param groupName			组名
-	 * @param remoteFileName	下载的文件的远程文件名
-	 * @param segmentSize		大文件切割成小文件分段下载时，切片分割成的小文件大小
-	 * @param localFilePath		下载时本地文件路径
-	 * @return 0 success, return none zero errno if fail
-	 */
-	public static int downloadBySegment(String groupName, String remoteFileName, 
-			int segmentSize, int size, String localFilePath) {
-		
-		int result = -1;
-		int index = 1;
-		long writeCount = 0;
-		long fileSize = getFileInfo(groupName, remoteFileName).getFileSize();
-		while(writeCount < fileSize) {	
-			//如果下载失败，继续下载，在这可以设置一定的规则（如:下载出现异常时，每间隔一段时间重试（间隔时长可配置化），超过重试次数后停止下载重试（重试次数可配置化））
-			try {
-				
-				String pathPrefix = remoteFileName.substring(0, remoteFileName.indexOf(groupName) + groupName.length()+1);
-				String fileExtName = remoteFileName.substring(remoteFileName.lastIndexOf("."));
-				String fileName = remoteFileName.substring(remoteFileName.indexOf(groupName) + groupName.length()+1, remoteFileName.lastIndexOf("."));
-				
-				// 生成分段下载每个分段的文件名（规则：在原文件名的前面加上序号）
-				fileName = fileName.replaceAll("/", "_") +"-"+ index;
-				String newFilePath = pathPrefix + fileName + fileExtName;
-				
-				result = storageClient.download_file(groupName, remoteFileName, size, segmentSize, 
-						new DownloadFileWriter(newFilePath));
-				
-				writeCount += segmentSize;
-				index ++;
-				
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
-		}
-		return result;
-	}
-	
+
 	/**
 	 * 断点下载（根据本地文件路径直接写入文件）
 	 * @param groupName			组名
 	 * @param remoteFileName	下载的文件的远程文件名
-	 * @param size				客户端已下载到本地的文件的大小（断点下载时将跳过已下载过的部分接着下载）
+	 * @param size				文件下载时的开始位置，客户端已下载到本地的文件的大小（断点下载时将跳过已下载过的部分接着下载）
 	 * @param localFilePath		下载到客户端本地的文件路径（上次未完成下载的文件在客户端本地存储的文件路径，本次断点下载后讲下载内容直接在此文件上继续追加）
 	 * @return 0 success, return none zero errno if fail
 	 */
-	public static int downloadAppend(String groupName, String remoteFileName, int size, String localFilePath) {
+	public static int downloadAppend(String groupName, String remoteFileName, long size, String localFilePath) {
 		int result = -1;
 		try {
 			result = storageClient.download_file(groupName, remoteFileName, size, 0, new DownloadFileWriter(localFilePath));
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+		return result;
+	}
+	
+	/**
+	 * 大文件分段下载（将大文件按指定大小分割后进行多线程下载）
+	 * @param groupName			组名
+	 * @param remoteFileName	下载的文件的远程文件名
+	 * @param segmentSize		大文件切割成小文件分段下载时，切片分割成的小文件大小，单位M
+	 * @param size				文件分段下载时每个片段的开始位置（分段多线程下载时，每断由一个线程下载，每个段的开始位置则有次参数指定）
+	 * @param localFilePath		下载时本地文件路径
+	 * @return 0 success, return none zero errno if fail
+	 */
+	public static int downloadBySegment(String groupName, String remoteFileName, 
+			long segmentSize, long size, String localFilePath, int index) {
+		
+		int result = -1;
+//		int index = 1;
+		segmentSize = segmentSize * 1024 * 1024;//将M转换为字节数
+		long fileSize = getFileInfo(groupName, remoteFileName).getFileSize();
+//		long writeCount = 0;
+//		while(writeCount < fileSize) {	
+			//如果下载失败，继续下载，在这可以设置一定的规则（如:下载出现异常时，每间隔一段时间重试（间隔时长可配置化），超过重试次数后停止下载重试（重试次数可配置化））
+			try {
+				
+//				if(fileSize - writeCount <= segmentSize) {	// 最后一个分段文件的实际大小处理
+//					segmentSize = fileSize - writeCount;
+//				}
+				if(fileSize-(index*segmentSize) <= segmentSize) {	// 最后一个分段文件的实际大小处理
+					segmentSize = fileSize-(index*segmentSize);
+				}
+				
+				String pathPrefix = localFilePath.substring(0, localFilePath.indexOf("incoming") + "incoming".length()+1);
+				String fileName = remoteFileName.substring(0, remoteFileName.lastIndexOf("."));
+				String fileExtName = remoteFileName.substring(remoteFileName.lastIndexOf("."));
+				
+				// 生成分段下载每个分段的文件名（规则：在原文件名的前面加上序号）
+				fileName = fileName.replaceAll("/", "_") +"-"+ index;
+				String newFilePath = pathPrefix + fileName + fileExtName;
+				
+				System.out.println(index+"分段文件地址："+newFilePath);
+				result = storageClient.download_file(groupName, remoteFileName, size, segmentSize, newFilePath);
+				//result = storageClient.download_file(groupName, remoteFileName, size, segmentSize, new DownloadFileWriter(newFilePath));
+				
+//				writeCount += segmentSize;
+				index ++;
+				
+			} catch (Exception e) {
+				e.printStackTrace();
+//				break;
+			}
+//		}
 		return result;
 	}
 	
