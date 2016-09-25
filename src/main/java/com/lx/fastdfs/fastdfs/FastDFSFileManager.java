@@ -12,6 +12,7 @@ import java.util.Map;
 import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
 import org.csource.common.IniFileReader;
+import org.csource.common.MyException;
 import org.csource.common.NameValuePair;
 import org.csource.fastdfs.ClientGlobal;
 import org.csource.fastdfs.DownloadStream;
@@ -331,7 +332,8 @@ public class FastDFSFileManager {
 	 * 断点下载（将文件内容写入到输出流中）
 	 * @param groupName			组名
 	 * @param remoteFileName	下载的文件的远程文件名
-	 * @param size		文件下载时的开始位置，客户端已下载到本地的文件的大小（断点下载时将跳过已下载过的部分接着下载）
+	 * @param size		文件下载时的开始位置，客户端已下载到本地的文件的大小（断点下载时将跳过已下载过的部分接着下载；</br>
+	 * 			注意：web请求下载时，size参数即为http请求头中的 Range字段，如http请求头Range参数 典型的格式如：1、Range: bytes=0-499 下载第0-499字节范围的内容，2、Range: bytes=500-999 下载第500-999字节范围的内容，3、Range: bytes=500- 下载从第500字节开始到文件结束部分的内容，4、Range: bytes=-500 下载最后500字节的内容
 	 * @param out		输出流（客户端下载时，可获取到客户端的输出流后，调用此接口直接将服务端的文件通过该输出流下载到客户端）
 	 * @return 0 success, return none zero errno if fail
 	 */
@@ -408,54 +410,63 @@ public class FastDFSFileManager {
 	}
 	
 	/**
-	 * 大文件分段下载（将大文件按指定大小分割后进行多线程下载）
+	 * 大文件切片分段下载（将大文件按指定大小分割成多个小文件下载）
 	 * @param groupName			组名
 	 * @param remoteFileName	下载的文件的远程文件名
-	 * @param segmentSize		大文件切割成小文件分段下载时，切片分割成的小文件大小，单位M
-	 * @param size				文件分段下载时每个片段的开始位置（分段多线程下载时，每断由一个线程下载，每个段的开始位置则有次参数指定）
+	 * @param segmentSize		每个分段文件字节数长度
 	 * @param localFilePath		下载时本地文件路径
-	 * @return 0 success, return none zero errno if fail
+	 * @return 0 success, -1 fail
 	 */
-	public static int downloadBySegment(String groupName, String remoteFileName, 
-			long segmentSize, long size, String localFilePath, int index) {
+	public static int downloadBySegment(String groupName, String remoteFileName,
+			long segmentSize, String localFilePath) {
 		
-		int result = -1;
-//		int index = 1;
-		segmentSize = segmentSize * 1024 * 1024;//将M转换为字节数
-		long fileSize = getFileInfo(groupName, remoteFileName).getFileSize();
-//		long writeCount = 0;
-//		while(writeCount < fileSize) {	
-			//如果下载失败，继续下载，在这可以设置一定的规则（如:下载出现异常时，每间隔一段时间重试（间隔时长可配置化），超过重试次数后停止下载重试（重试次数可配置化））
-			try {
+		int completeFlag = -1;
+		try {
+			
+			// 获取文件大小
+			long fileSize = FastDFSFileManager.getFileInfo(groupName, remoteFileName).getFileSize();
+			
+			String pathPrefix = localFilePath.substring(0, localFilePath.indexOf("incoming") + "incoming".length()+1);
+			String fileName = remoteFileName.substring(0, remoteFileName.lastIndexOf(".")).replaceAll("/", "_") +"_part-";
+			String fileExtName = remoteFileName.substring(remoteFileName.lastIndexOf("."));
+			
+			int fileIndex = 1;
+			int writedCount = 0;
+			while(writedCount < fileSize) {
 				
-//				if(fileSize - writeCount <= segmentSize) {	// 最后一个分段文件的实际大小处理
-//					segmentSize = fileSize - writeCount;
-//				}
-				if(fileSize-(index*segmentSize) <= segmentSize) {	// 最后一个分段文件的实际大小处理
-					segmentSize = fileSize-(index*segmentSize);
+				if(fileSize - writedCount <= segmentSize) {
+					segmentSize = fileSize - writedCount;
 				}
 				
-				String pathPrefix = localFilePath.substring(0, localFilePath.indexOf("incoming") + "incoming".length()+1);
-				String fileName = remoteFileName.substring(0, remoteFileName.lastIndexOf("."));
-				String fileExtName = remoteFileName.substring(remoteFileName.lastIndexOf("."));
+				// 每个分段的文件名
+				String newFilePath = pathPrefix + fileName + fileIndex + fileExtName;
 				
-				// 生成分段下载每个分段的文件名（规则：在原文件名的前面加上序号）
-				fileName = fileName.replaceAll("/", "_") +"-"+ index;
-				String newFilePath = pathPrefix + fileName + fileExtName;
+				System.out.println("\nfileOffset="+writedCount+"\t  download_bytes="+segmentSize);
+				int result = storageClient.download_file(groupName, remoteFileName, writedCount, segmentSize, newFilePath);
+				if(result == 0) {
+					System.out.println("下载成功，分段文件路径："+newFilePath);
+				} else {
+					System.out.println("下载失败，分段文件路径："+newFilePath);
+				}
 				
-				System.out.println(index+"分段文件地址："+newFilePath);
-				result = storageClient.download_file(groupName, remoteFileName, size, segmentSize, newFilePath);
-				//result = storageClient.download_file(groupName, remoteFileName, size, segmentSize, new DownloadFileWriter(newFilePath));
-				
-//				writeCount += segmentSize;
-				index ++;
-				
-			} catch (Exception e) {
-				e.printStackTrace();
-//				break;
+				writedCount += segmentSize;
+				fileIndex++;
 			}
-//		}
-		return result;
+			
+			if(writedCount == fileSize) {
+				completeFlag = 0;
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return completeFlag;
+	}
+	
+	/**
+	 * 合并分段下载后的分片文件为一个完整的文件
+	 */
+	public void mergeSegmentFile() {
+		
 	}
 	
 	/**
@@ -551,5 +562,31 @@ public class FastDFSFileManager {
 			e.printStackTrace();
 		}
 		return null;
+	}
+	
+	
+	public static TrackerClient getTrackerClient() {
+		return trackerClient;
+	}
+	public static void setTrackerClient(TrackerClient trackerClient) {
+		FastDFSFileManager.trackerClient = trackerClient;
+	}
+	public static TrackerServer getTrackerServer() {
+		return trackerServer;
+	}
+	public static void setTrackerServer(TrackerServer trackerServer) {
+		FastDFSFileManager.trackerServer = trackerServer;
+	}
+	public static StorageServer getStorageServer() {
+		return storageServer;
+	}
+	public static void setStorageServer(StorageServer storageServer) {
+		FastDFSFileManager.storageServer = storageServer;
+	}
+	public static StorageClient getStorageClient() {
+		return storageClient;
+	}
+	public static void setStorageClient(StorageClient storageClient) {
+		FastDFSFileManager.storageClient = storageClient;
 	}
 }

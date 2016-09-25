@@ -118,30 +118,13 @@ public class FastDFSFileManagerTest {
 			}*/
 			
 			// 断点下载3：
-			/*long length = 0;	//默认已经下载到本地的文件大小
+			long length = 0;	//默认已经下载到本地的文件大小
 			File downloadedFile = new File(fileSavePath);
 			if(downloadedFile.exists()) {	// 如果本地已经下载过该文件，但未下完，则获取该文件大小，并在本次下载时跳过已下载部分接着下载
 				length = downloadedFile.length();
 			}
 			int state3 = FastDFSFileManager.downloadAppend(groupName, remoteFileName, length, fileSavePath);
 			if(state3 == 0) {
-				System.out.println("下载完毕");
-			}*/
-			
-			// 分段下载4：
-			// 本次分段测试将一个文件分成两个文件进行下载
-			// 1）第1个分段文件大小：0~40960
-			long startOffset = 0;		//多线程分段下载时每个片段的开始位置
-			long segmentSize = 20;	//切片分段下载时每个分段文件的大小，单位M，1：设置为一个正整数表示下载的每个分片文件大小为该值，2：设置为0表示从开始位置一直到文件结尾
-			int state4 = FastDFSFileManager.downloadBySegment(groupName, remoteFileName, segmentSize, startOffset, fileSavePath,1);
-			if(state4 == 0) {
-				System.out.println("下载完毕");
-			}
-			// 2）第2个分段文件大小：40960~整个文件大小
-			startOffset = 20 * 1024 * 1024;		//多线程分段下载时每个片段的开始位置
-			segmentSize = 0;		//切片分段下载时每个分段文件的大小，1：设置为一个正整数表示下载的每个分片文件大小为该值，2：设置为0表示从开始位置一直到文件结尾
-			int state5 = FastDFSFileManager.downloadBySegment(groupName, remoteFileName, segmentSize, startOffset, fileSavePath,2);
-			if(state5 == 0) {
 				System.out.println("下载完毕");
 			}
 			
@@ -151,7 +134,29 @@ public class FastDFSFileManagerTest {
 			e.printStackTrace();
 		}
 	}
-
+	
+	/**
+	 * 大文件分段多线程下载，将一个文件分成多个片段下载
+	 */
+	@Test
+	public void testDownloadBySegment() {
+		try {
+			String fileSavePath = FileUtils.getWebappPath()+"incoming/wKgAllfVgn-EW1h9AAAAAAAAAAA319.zip";
+			
+			String groupName = "group1";
+			String remoteFileName = "M00/00/00/wKgAllfVgn-EW1h9AAAAAAAAAAA319.zip";
+			
+			// 将大文件分割下载成20M大小的小文件
+			long segmentSize = 20 * 1024 * 1024;	//切片分段下载时每个分段文件的大小，1：设置为一个正整数表示下载的每个分片文件大小为该值，2：设置为0表示从开始位置一直到文件结尾
+			long completeFlag = FastDFSFileManager.downloadBySegment(groupName, remoteFileName, segmentSize, fileSavePath);
+			if(completeFlag == 0) {
+				System.out.println("下载成功");
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
 	/**
 	 * 测试根据存储节点服务器返回的 存储节点组名 和 远程文件名 获取fdfs服务中的
 	 * @throws Exception
