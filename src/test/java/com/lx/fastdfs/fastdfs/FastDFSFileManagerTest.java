@@ -3,6 +3,7 @@ package com.lx.fastdfs.fastdfs;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.OutputStream;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -153,6 +154,20 @@ public class FastDFSFileManagerTest {
 				System.out.println("下载成功");
 			}
 		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
+	/**
+	 * 测试合并下载的多个分段文件
+	 */
+	@Test
+	public void testMergeSegmentFile() {
+		String dirPath = FileUtils.getWebappPath()+"incoming";
+		FastDFSFileManager fileManager = new FastDFSFileManager();
+		try {
+			fileManager.mergeSegmentFile(dirPath, null);
+		} catch (IOException e) {
 			e.printStackTrace();
 		}
 	}

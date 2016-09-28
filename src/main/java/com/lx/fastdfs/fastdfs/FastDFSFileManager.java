@@ -3,11 +3,17 @@ package com.lx.fastdfs.fastdfs;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.SequenceInputStream;
 import java.text.DecimalFormat;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
+import java.util.Vector;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
@@ -24,6 +30,8 @@ import org.csource.fastdfs.StorageServer;
 import org.csource.fastdfs.TrackerClient;
 import org.csource.fastdfs.TrackerServer;
 import org.csource.fastdfs.test.DownloadFileWriter;
+
+import com.lx.fastdfs.util.FileUtils;
 
 
 /**
@@ -52,6 +60,9 @@ public class FastDFSFileManager {
 	private static TrackerServer  trackerServer;
 	private static StorageServer  storageServer;
 	private static StorageClient  storageClient;
+	
+	private static final String SEGMENT_FILE_NAME_FLAG = "_part-";	// 分段下载文件后的分段文件名标记
+	private static final String SEGMENT_FILE_EXT_NAME = ".segment";	// 分段文件后缀名
 	
 	
 	// 初始化 FastDFS 客户端配置信息
@@ -427,8 +438,6 @@ public class FastDFSFileManager {
 			long fileSize = FastDFSFileManager.getFileInfo(groupName, remoteFileName).getFileSize();
 			
 			String pathPrefix = localFilePath.substring(0, localFilePath.indexOf("incoming") + "incoming".length()+1);
-			String fileName = remoteFileName.substring(0, remoteFileName.lastIndexOf(".")).replaceAll("/", "_") +"_part-";
-			String fileExtName = remoteFileName.substring(remoteFileName.lastIndexOf("."));
 			
 			int fileIndex = 1;
 			int writedCount = 0;
@@ -438,8 +447,9 @@ public class FastDFSFileManager {
 					segmentSize = fileSize - writedCount;
 				}
 				
-				// 每个分段的文件名
-				String newFilePath = pathPrefix + fileName + fileIndex + fileExtName;
+				// 每个分段的文件名，如：M00_00_00_wKgAllfVgn-EW1h9AAAAAAAAAAA319.zip_segment-3.part
+				String newFileName = remoteFileName.replaceAll("/", "_") + SEGMENT_FILE_NAME_FLAG + fileIndex + SEGMENT_FILE_EXT_NAME;
+				String newFilePath = pathPrefix + newFileName;
 				
 				System.out.println("\nfileOffset="+writedCount+"\t  download_bytes="+segmentSize);
 				int result = storageClient.download_file(groupName, remoteFileName, writedCount, segmentSize, newFilePath);
@@ -463,9 +473,62 @@ public class FastDFSFileManager {
 	}
 	
 	/**
-	 * 合并分段下载后的分片文件为一个完整的文件
+	 * 合并分段下载后的分片文件为一个完整的文件（使用 java.io.SequenceInputStream 合并多个文件）
+	 * @param dirPath		文件所在目录路径
+	 * @param mergeFileName	合并后的文件名，可为空，空则默认使用分段文件名的前缀源文件名，如：分段文件名M00_00_00_wKgAllfVgn-EW1h9AAAAAAAAAAA319.zip_segment-20.part的源文件名：M00_00_00_wKgAllfVgn-EW1h9AAAAAAAAAAA319.zip
+	 * @throws IOException 
 	 */
-	public void mergeSegmentFile() {
+	public void mergeSegmentFile(String dirPath, String mergeFileName) throws IOException {
+		
+		SequenceInputStream seqIStream = null;
+		OutputStream out = null;
+		try {
+			Vector<InputStream> streams = new Vector<InputStream>();
+			List<File> files = FileUtils.getDirFiles(dirPath, SEGMENT_FILE_NAME_FLAG, SEGMENT_FILE_EXT_NAME);
+			
+			if(StringUtils.isEmpty(mergeFileName)) {	// 合并文件名未指定，则默认使用分段文件名中的源文件名名称
+				mergeFileName = files.get(0).getName().split(SEGMENT_FILE_NAME_FLAG)[0];
+			}
+			Collections.sort(files, new FileComparator());
+			
+			for (File file : files) {
+				streams.add(new FileInputStream(file));
+			}
+			
+			seqIStream = new SequenceInputStream(streams.elements());
+			
+			dirPath = dirPath.endsWith("/") ? dirPath : (dirPath+"/");
+			out = new FileOutputStream(dirPath+mergeFileName);
+			
+			int len = 0;
+			int count = 0;
+			byte[] buff = new byte[4096];
+			while((count = seqIStream.read(buff, 0, buff.length)) != -1) {
+				seqIStream.read(buff, 0, buff.length);
+				out.write(buff);
+				len += count;
+			}
+			System.out.println("合并文件总长度："+len);
+		} catch (IOException e) {
+			e.printStackTrace();
+		} finally {
+			if(seqIStream != null) {
+				seqIStream.close();
+			}
+			if(out != null) {
+				out.close();
+			}
+		}
+		
+	}
+	
+	/**
+	 * 合并分段下载后的分片文件为一个完整的文件（使用  java.io.RandomAccessFile 合并多个文件）
+	 * @param dirPath	文件目录路径
+	 * @param mergeFileName	合并后的文件名
+	 * @param saveDirPath	合并后的文件存放目录，为空默认存放到分段文件目录dirPath下
+	 */
+	public static void mergeSegmentFile(String dirPath, String mergeFileName, String saveDirPath) {
 		
 	}
 	
@@ -588,5 +651,17 @@ public class FastDFSFileManager {
 	}
 	public static void setStorageClient(StorageClient storageClient) {
 		FastDFSFileManager.storageClient = storageClient;
+	}
+	
+
+	/**
+	 * 根据文件名，比较文件
+	 * @author lx
+	 */
+	private class FileComparator implements Comparator<File> {
+		@Override
+		public int compare(File o1, File o2) {
+			return o1.getName().compareTo(o2.getName());
+		}
 	}
 }
