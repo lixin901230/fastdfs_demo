@@ -446,7 +446,6 @@ public class FastDFSFileManager {
 				if(fileSize - writedCount <= segmentSize) {
 					segmentSize = fileSize - writedCount;
 				}
-				
 				// 每个分段的文件名，如：M00_00_00_wKgAllfVgn-EW1h9AAAAAAAAAAA319.zip_part-3.segment
 				String newFileName = remoteFileName.replaceAll("/", "_") + SEGMENT_FILE_NAME_FLAG + fileIndex + SEGMENT_FILE_EXT_NAME;
 				String newFilePath = pathPrefix + newFileName;
