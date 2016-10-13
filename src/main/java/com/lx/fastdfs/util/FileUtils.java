@@ -70,8 +70,8 @@ public class FileUtils {
 			int len = 0;
 			int count = 0;
 			byte[] buff = new byte[4096];
-			while((count=is.read(buff, 0, buff.length)) != -1) {
-				out.write(buff, 0, buff.length);
+			while((count=is.read(buff)) != -1) {
+				out.write(buff, 0, count);
 				len += count;
 			}
 			conn.disconnect();
@@ -107,8 +107,8 @@ public class FileUtils {
 			int len = 0;
 			int count = 0;
 			byte[] buff = new byte[4096];
-			while((count=is.read(buff, 0, buff.length)) != -1) {
-				outputStream.write(buff, 0, buff.length);
+			while((count=is.read(buff)) != -1) {
+				outputStream.write(buff, 0, count);
 				len += count;
 			}
 			conn.disconnect();
@@ -139,8 +139,8 @@ public class FileUtils {
 			int len = 0;
 			int count = 0;
 			byte[] buff = new byte[4096];
-			while((count=inputStream.read(buff, 0, buff.length)) != -1) {
-				outputStream.write(buff, 0, buff.length);
+			while((count=inputStream.read(buff)) != -1) {
+				outputStream.write(buff, 0, count);
 				len += count;
 			}
 			System.out.println("下载文件大小："+len);

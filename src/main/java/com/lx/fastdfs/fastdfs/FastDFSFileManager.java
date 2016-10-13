@@ -11,6 +11,7 @@ import java.io.SequenceInputStream;
 import java.text.DecimalFormat;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
 import java.util.Vector;
@@ -472,17 +473,17 @@ public class FastDFSFileManager {
 	}
 	
 	/**
-	 * 合并分段下载后的分片文件为一个完整的文件（使用 java.io.SequenceInputStream 合并多个文件）
+	 * 合并分段下载后的分片文件为一个完整的文件（使用 java.io.SequenceInputStream 合并多个文件流）
 	 * @param dirPath		文件所在目录路径
 	 * @param mergeFileName	合并后的文件名，可为空，空则默认使用分段文件名的前缀源文件名，如：分段文件名M00_00_00_wKgAllfVgn-EW1h9AAAAAAAAAAA319.zip_segment-20.part的源文件名：M00_00_00_wKgAllfVgn-EW1h9AAAAAAAAAAA319.zip
 	 * @throws IOException 
 	 */
-	public void mergeSegmentFile(String dirPath, String mergeFileName) throws IOException {
+	public void mergeSegmentFile(String dirPath, String mergeFileName) throws Exception {
 		
 		SequenceInputStream seqIStream = null;
 		OutputStream out = null;
 		try {
-			Vector<InputStream> streams = new Vector<InputStream>();
+			Vector<FileInputStream> vector = new Vector<FileInputStream>();
 			List<File> files = FileUtils.getDirFiles(dirPath, SEGMENT_FILE_NAME_FLAG, SEGMENT_FILE_EXT_NAME);
 			
 			if(StringUtils.isEmpty(mergeFileName)) {	// 合并文件名未指定，则默认使用分段文件名中的源文件名名称
@@ -491,10 +492,15 @@ public class FastDFSFileManager {
 			Collections.sort(files, new FileComparator());
 			
 			for (File file : files) {
-				streams.add(new FileInputStream(file));
+				if(file.exists() && file.isFile()) {
+					vector.add(new FileInputStream(file));
+				} else {
+					throw new Exception(file.getParent()+"文件不存在，合并失败");
+				}
 			}
 			
-			seqIStream = new SequenceInputStream(streams.elements());
+			Enumeration<FileInputStream> enumeration = vector.elements();
+			seqIStream = new SequenceInputStream(enumeration);
 			
 			dirPath = dirPath.endsWith("/") ? dirPath : (dirPath+"/");
 			out = new FileOutputStream(dirPath+mergeFileName);
@@ -502,9 +508,8 @@ public class FastDFSFileManager {
 			int len = 0;
 			int count = 0;
 			byte[] buff = new byte[4096];
-			while((count = seqIStream.read(buff, 0, buff.length)) != -1) {
-				seqIStream.read(buff, 0, buff.length);
-				out.write(buff);
+			while((count = seqIStream.read(buff)) != -1) {
+				out.write(buff, 0, count);
 				len += count;
 			}
 			System.out.println("合并文件总长度："+len);

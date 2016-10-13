@@ -167,7 +167,7 @@ public class FastDFSFileManagerTest {
 		FastDFSFileManager fileManager = new FastDFSFileManager();
 		try {
 			fileManager.mergeSegmentFile(dirPath, null);
-		} catch (IOException e) {
+		} catch (Exception e) {
 			e.printStackTrace();
 		}
 	}
