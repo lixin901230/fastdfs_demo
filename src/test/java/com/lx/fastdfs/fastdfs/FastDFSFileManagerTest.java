@@ -2,9 +2,6 @@ package com.lx.fastdfs.fastdfs;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -164,9 +161,8 @@ public class FastDFSFileManagerTest {
 	@Test
 	public void testMergeSegmentFile() {
 		String dirPath = FileUtils.getWebappPath()+"incoming";
-		FastDFSFileManager fileManager = new FastDFSFileManager();
 		try {
-			fileManager.mergeSegmentFile(dirPath, null);
+			FastDFSFileManager.mergeSegmentFile(dirPath, null);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

@@ -1,16 +1,18 @@
 package com.lx.fastdfs.util;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.SequenceInputStream;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collections;
+import java.util.Enumeration;
 import java.util.List;
 import java.util.Vector;
 
@@ -23,8 +25,6 @@ public class FileUtils {
 	
 	public static final String INCOMING = "incoming";	// 项目下资源文件存储目录
 
-	private static final String HttpURLConnection = null;
-	
 	/**
 	 * 下载二进制文件到本地
 	 * @param bytes
@@ -179,20 +179,16 @@ public class FileUtils {
 	
 	/**
 	 * 通过正则匹配获取指定目录下包含指定文件标识和缀文件名的所有文件（不包含文件夹）
-	 * @param dirPath		目录路径
-	 * @param fileSegmentFlag	分片文件表示，分段下载文件后各个分段文件的文件名标记
-	 * @param fileExtName		分段文件名扩展名
+	 * @param dirPath	目录路径
+	 * @param regex		正则表达式字符串；用于从指定目录中找出与该正则表达式匹配的文件名的文件
 	 * @return
 	 */
-	public static List<File> getDirFiles(String dirPath, final String fileSegmentFlag, final String fileExtName) {
+	public static List<File> getDirFiles(String dirPath, final String regex) {
 		
 		File file = new File(dirPath);
 		File[] fileArr = file.listFiles(new FilenameFilter() {
 			@Override
 			public boolean accept(File dir, String name) {
-				
-				//正则匹配文件名，如：String name = "M00_00_00_wKgAllfVgn-EW1h9AAAAAAAAAAA319.zip_part-20.segment";
-				String regex = ".*"+fileSegmentFlag.toLowerCase()+"[0-9]+"+fileExtName.toLowerCase(); // 正则匹配多个任意字符，后面拼有fileSegmentFlag变量值，接着拼有1个或多个数字数字，且后缀名为fileExtName变量值的文件名
 				if(name.toLowerCase().matches(regex)) {
 					return true;
 				}
@@ -207,6 +203,80 @@ public class FileUtils {
 			}
 		}
 		return files;
+	}
+	
+	/**
+	 * 合并文件流
+	 * @param dirPath		文件所在目录路径
+	 * @param mergeFileName	合并后的文件名
+	 * @param regex	用于根据文件名从dirPath参数指定的目录中筛选文件的正则表达式
+	 * @param isDesc 是否需要倒序，true：是，false：否，默认false；在多线程下载使用了并发线程计数器后，则合并文件时需要使用该参数倒序排序子文件后再合并
+	 * @throws IOException 
+	 */
+	public static void mergeSegmentFile(String dirPath, String mergeFileName, String regex, boolean isDesc) {
+		
+		try {
+			List<File> files = FileUtils.getDirFiles(dirPath, regex);
+			FileUtils.mergeSegmentFile(dirPath, mergeFileName, files, isDesc);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
+	/**
+	 * 合并分段下载后的分片文件为一个完整的文件（使用 java.io.SequenceInputStream 合并多个文件流）
+	 * @param dirPath		文件所在目录路径
+	 * @param mergeFileName	合并后的文件名
+	 * @param files	分片文件名集合
+	 * @param isDesc 是否需要倒序，true：是，false：否，默认false；在多线程下载使用了并发线程计数器后，则合并文件时需要使用该参数倒序排序子文件后再合并
+	 * @throws IOException 
+	 */
+	public static void mergeSegmentFile(String dirPath, String mergeFileName, List<File> files, boolean isDesc) throws Exception {
+		
+		SequenceInputStream seqIStream = null;
+		OutputStream out = null;
+		try {
+			
+			// 排序分片文件
+			Collections.sort(files, new FileComparator());
+			if(isDesc) {
+				Collections.reverse(files);
+			}
+			
+			Vector<FileInputStream> vector = new Vector<FileInputStream>();
+			for (File file : files) {
+				if(file.exists() && file.isFile()) {
+					vector.add(new FileInputStream(file));
+				} else {
+					throw new Exception(file.getParent()+"文件不存在，合并失败");
+				}
+			}
+			
+			Enumeration<FileInputStream> enumeration = vector.elements();
+			seqIStream = new SequenceInputStream(enumeration);
+			
+			dirPath = dirPath.endsWith("/") ? dirPath : (dirPath+"/");
+			String fileRealPath = dirPath + mergeFileName;
+			out = new FileOutputStream(fileRealPath);
+			
+			int len = 0;
+			int count = 0;
+			byte[] buff = new byte[4096];
+			while((count = seqIStream.read(buff)) != -1) {
+				out.write(buff, 0, count);
+				len += count;
+			}
+			System.out.println("合并文件总长度："+len);
+		} catch (IOException e) {
+			e.printStackTrace();
+		} finally {
+			if(seqIStream != null) {
+				seqIStream.close();
+			}
+			if(out != null) {
+				out.close();
+			}
+		}
 	}
 	
 	/**

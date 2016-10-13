@@ -1,11 +1,13 @@
 package com.lx.fastdfs.fastdfs;
 
 import java.io.File;
-import java.util.Date;
+import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
 import org.csource.fastdfs.ClientGlobal;
 import org.csource.fastdfs.StorageClient;
@@ -14,6 +16,8 @@ import org.csource.fastdfs.StorageServer;
 import org.csource.fastdfs.TrackerClient;
 import org.csource.fastdfs.TrackerServer;
 
+import com.lx.fastdfs.util.FileUtils;
+
 /**
  * 大文件多线程分段下载
  * @author lx
@@ -21,6 +25,9 @@ import org.csource.fastdfs.TrackerServer;
 public class MultiThreadDownlad {
 	
 	private static Logger logger  = Logger.getLogger(MultiThreadDownlad.class);
+	
+	private static final String SEGMENT_FILE_NAME_FLAG = "_file-";	// 分段下载文件后的分段文件名标记
+	private static final String SEGMENT_FILE_EXT_NAME = ".segment";	// 分段文件后缀名
 	
 	/**
 	 * 大文件多线程分段下载的线程数
@@ -100,8 +107,6 @@ public class MultiThreadDownlad {
 		private long fileEndPos;
 		private String localFilePath;
 		
-		private Object lock = new Object();
-		
 		public DownloadThread(StorageClient storageClient, String groupName, 
 				String remoteFileName, String localFilePath, long fileStartPos, long fileEndPos) {
 			this.storageClient = storageClient;
@@ -115,40 +120,54 @@ public class MultiThreadDownlad {
 		@Override
 		public void run() {
 			synchronized(DownloadThread.class){
-			
-			long threadNo = latch.getCount();
-			Thread.currentThread().setName("线程："+threadNo);
-			System.out.println(Thread.currentThread().getName());
-			
-			String extName = remoteFileName.substring(remoteFileName.lastIndexOf("."));
-			String fileName = remoteFileName.substring(remoteFileName.lastIndexOf("/")+1, remoteFileName.lastIndexOf(".")) +"_"+ threadNo +"_"+ new Date().getTime() + extName;
-			String downloadRealFilePath = localFilePath +"/"+ fileName;
-			try {
-				File tempFile = new File(downloadRealFilePath);
-				if(tempFile.exists()) {
-					fileStartPos = tempFile.length();
+				long threadNo = latch.getCount();
+				Thread.currentThread().setName("线程："+threadNo);
+				System.out.println(Thread.currentThread().getName());
+				
+				// 文件名如：wKgAllfVgn-EW1h9AAAAAAAAAAA319.zip_file-1.segment
+				String newFileName = remoteFileName.replaceAll("/", "_") + SEGMENT_FILE_NAME_FLAG + threadNo + SEGMENT_FILE_EXT_NAME;
+				String downloadRealFilePath = localFilePath +"/"+ newFileName;
+				try {
+					File tempFile = new File(downloadRealFilePath);
+					if(tempFile.exists()) {
+						fileStartPos = tempFile.length();
+					}
+					
+					System.out.println(downloadRealFilePath);
+					System.out.println("fileStartPos="+fileStartPos);
+					
+					int flag = storageClient.download_file(groupName, remoteFileName, fileStartPos, fileEndPos, downloadRealFilePath);
+					latch.countDown();	//当前子线程下载任务完成，通知线程计数器该线程执行完成
+					
+					System.out.println("线程："+latch.getCount()+" 下载完成");
+					
+				} catch (Exception e) {
+					e.printStackTrace();
 				}
-				
-				System.out.println(downloadRealFilePath);
-				System.out.println("fileStartPos="+fileStartPos);
-				
-				int flag = storageClient.download_file(groupName, remoteFileName, fileStartPos, fileEndPos, downloadRealFilePath);
-				latch.countDown();	//当前子线程下载任务完成，通知线程计数器该线程执行完成
-				
-				System.out.println("线程："+latch.getCount()+" 下载完成");
-				
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
 			}
 		}
 	}
 	
-
 	/**
-	 * 合并下载后的分片文件
+	 * 合并分段下载后的分片文件为一个完整的文件（使用 java.io.SequenceInputStream 合并多个文件流）
+	 * @param dirPath		文件所在目录路径
+	 * @param mergeFileName	合并后的文件名，可为空，空则默认使用分段文件名的前缀源文件名，如：分段文件名M00_00_00_wKgAllfVgn-EW1h9AAAAAAAAAAA319.zip_segment-20.part的源文件名：M00_00_00_wKgAllfVgn-EW1h9AAAAAAAAAAA319.zip
+	 * @throws IOException 
 	 */
-	public void mergeSegmentFile() {
+	public static void mergeSegmentFile(String dirPath, String mergeFileName) {
 		
+		try {
+			//正则匹配文件名，如：String name = "M00_00_00_wKgAllfVgn-EW1h9AAAAAAAAAAA319.zip_part-20.segment";
+			String regex = ".*"+ SEGMENT_FILE_NAME_FLAG.toLowerCase() +"[0-9]+"+ SEGMENT_FILE_EXT_NAME.toLowerCase(); // 正则匹配多个任意字符，后面拼有fileSegmentFlag变量值，接着拼有1个或多个数字数字，且后缀名为fileExtName变量值的文件名
+			List<File> files = FileUtils.getDirFiles(dirPath, regex);
+			
+			if(StringUtils.isEmpty(mergeFileName)) {	// 合并文件名未指定，则默认使用分段文件名中的源文件名名称
+				mergeFileName = files.get(0).getName().split(SEGMENT_FILE_NAME_FLAG)[0];
+			}
+			
+			FileUtils.mergeSegmentFile(dirPath, mergeFileName, files, true);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 }

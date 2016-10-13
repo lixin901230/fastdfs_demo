@@ -3,23 +3,16 @@ package com.lx.fastdfs.fastdfs;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.SequenceInputStream;
 import java.text.DecimalFormat;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
-import java.util.Vector;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
 import org.csource.common.IniFileReader;
-import org.csource.common.MyException;
 import org.csource.common.NameValuePair;
 import org.csource.fastdfs.ClientGlobal;
 import org.csource.fastdfs.DownloadStream;
@@ -478,52 +471,21 @@ public class FastDFSFileManager {
 	 * @param mergeFileName	合并后的文件名，可为空，空则默认使用分段文件名的前缀源文件名，如：分段文件名M00_00_00_wKgAllfVgn-EW1h9AAAAAAAAAAA319.zip_segment-20.part的源文件名：M00_00_00_wKgAllfVgn-EW1h9AAAAAAAAAAA319.zip
 	 * @throws IOException 
 	 */
-	public void mergeSegmentFile(String dirPath, String mergeFileName) throws Exception {
+	public static void mergeSegmentFile(String dirPath, String mergeFileName) {
 		
-		SequenceInputStream seqIStream = null;
-		OutputStream out = null;
 		try {
-			Vector<FileInputStream> vector = new Vector<FileInputStream>();
-			List<File> files = FileUtils.getDirFiles(dirPath, SEGMENT_FILE_NAME_FLAG, SEGMENT_FILE_EXT_NAME);
+			//正则匹配文件名，如：String name = "M00_00_00_wKgAllfVgn-EW1h9AAAAAAAAAAA319.zip_part-20.segment";
+			String regex = ".*"+ SEGMENT_FILE_NAME_FLAG.toLowerCase() +"[0-9]+"+ SEGMENT_FILE_EXT_NAME.toLowerCase(); // 正则匹配多个任意字符，后面拼有fileSegmentFlag变量值，接着拼有1个或多个数字数字，且后缀名为fileExtName变量值的文件名
+			List<File> files = FileUtils.getDirFiles(dirPath, regex);
 			
 			if(StringUtils.isEmpty(mergeFileName)) {	// 合并文件名未指定，则默认使用分段文件名中的源文件名名称
 				mergeFileName = files.get(0).getName().split(SEGMENT_FILE_NAME_FLAG)[0];
 			}
-			Collections.sort(files, new FileComparator());
 			
-			for (File file : files) {
-				if(file.exists() && file.isFile()) {
-					vector.add(new FileInputStream(file));
-				} else {
-					throw new Exception(file.getParent()+"文件不存在，合并失败");
-				}
-			}
-			
-			Enumeration<FileInputStream> enumeration = vector.elements();
-			seqIStream = new SequenceInputStream(enumeration);
-			
-			dirPath = dirPath.endsWith("/") ? dirPath : (dirPath+"/");
-			out = new FileOutputStream(dirPath+mergeFileName);
-			
-			int len = 0;
-			int count = 0;
-			byte[] buff = new byte[4096];
-			while((count = seqIStream.read(buff)) != -1) {
-				out.write(buff, 0, count);
-				len += count;
-			}
-			System.out.println("合并文件总长度："+len);
-		} catch (IOException e) {
+			FileUtils.mergeSegmentFile(dirPath, mergeFileName, files, false);
+		} catch (Exception e) {
 			e.printStackTrace();
-		} finally {
-			if(seqIStream != null) {
-				seqIStream.close();
-			}
-			if(out != null) {
-				out.close();
-			}
 		}
-		
 	}
 	
 	/**
@@ -655,17 +617,5 @@ public class FastDFSFileManager {
 	}
 	public static void setStorageClient(StorageClient storageClient) {
 		FastDFSFileManager.storageClient = storageClient;
-	}
-	
-
-	/**
-	 * 根据文件名，比较文件
-	 * @author lx
-	 */
-	private class FileComparator implements Comparator<File> {
-		@Override
-		public int compare(File o1, File o2) {
-			return o1.getName().compareTo(o2.getName());
-		}
 	}
 }

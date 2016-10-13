@@ -22,4 +22,17 @@ public class MultiTreadDownloadTest {
 			e.printStackTrace();
 		}
 	}
+	
+	/**
+	 * 测试合并多线程分段下载的多个文件
+	 */
+	@Test
+	public void testMergeSegmentFile() {
+		String dirPath = FileUtils.getWebappPath()+"incoming";
+		try {
+			MultiThreadDownlad.mergeSegmentFile(dirPath, null);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
 }
