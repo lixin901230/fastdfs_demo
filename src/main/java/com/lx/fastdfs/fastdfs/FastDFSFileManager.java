@@ -177,21 +177,6 @@ public class FastDFSFileManager {
 	}
 	
 	/**
-	 * 获取文件扩展名
-	 * @param fileName	文件名
-	 * @return
-	 * @throws Exception 
-	 */
-	public static String getFileExtName(String fileName) throws Exception {
-		
-		if(StringUtils.isEmpty(fileName)) {
-			throw new Exception("文件名不能为空");
-		}
-		int pos = fileName.lastIndexOf(".");
-		return pos > 0 ? fileName.substring(pos+1) : "";
-	}
-	
-	/**
 	 * 文件上传，如果fileid不为空则代表是续传
 	 * @param localFilePath	本地文件绝对路径
 	 * @param fileId		远程文件id，不为空为续传，可为空
@@ -223,7 +208,7 @@ public class FastDFSFileManager {
 				}*/
 				
 				// 方式二、使用 StorageClient1，上传一个0字节，获取一个fileId
-				fileId = storageClient1.upload_appender_file1(new byte[]{}, getFileExtName(file.getName()), meta_list);
+				fileId = storageClient1.upload_appender_file1(new byte[]{}, FileUtils.getFileExtName(file.getName()), meta_list);
 				
 				System.out.println(">>>>>>文件id："+fileId);
 			}
