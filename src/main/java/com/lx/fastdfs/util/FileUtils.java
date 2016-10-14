@@ -16,6 +16,7 @@ import java.util.Enumeration;
 import java.util.List;
 import java.util.Vector;
 
+import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -24,7 +25,22 @@ public class FileUtils {
 	private static Logger logger = LoggerFactory.getLogger(FileUtils.class);
 	
 	public static final String INCOMING = "incoming";	// 项目下资源文件存储目录
-
+	
+	/**
+	 * 获取文件扩展名
+	 * @param fileName	文件名
+	 * @return
+	 * @throws Exception 
+	 */
+	public static String getFileExtName(String fileName) throws Exception {
+		
+		if(StringUtils.isEmpty(fileName)) {
+			throw new Exception("文件名不能为空");
+		}
+		int pos = fileName.lastIndexOf(".");
+		return pos > 0 ? fileName.substring(pos+1) : "";
+	}
+	
 	/**
 	 * 下载二进制文件到本地
 	 * @param bytes

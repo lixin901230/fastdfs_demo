@@ -32,7 +32,7 @@ public class MultiThreadDownlad {
 	/**
 	 * 大文件多线程分段下载的线程数
 	 */
-	private static final int TCOUNT = 10;
+	private static final int TCOUNT = 5;
 	
 	/**
 	 * 线程计数器，作用：使一个线程等待其他线程完成各自的工作后再执行，多线程分段下载文件时，用该类来控制主线程等各个子线程下载完成后，再进行文件合并
@@ -157,7 +157,7 @@ public class MultiThreadDownlad {
 	public static void mergeSegmentFile(String dirPath, String mergeFileName) {
 		
 		try {
-			//正则匹配文件名，如：String name = "M00_00_00_wKgAllfVgn-EW1h9AAAAAAAAAAA319.zip_part-20.segment";
+			//正则匹配文件名，如：String name = "M00_00_00_wKgAllfVgn-EW1h9AAAAAAAAAAA319.zip_file-20.segment";
 			String regex = ".*"+ SEGMENT_FILE_NAME_FLAG.toLowerCase() +"[0-9]+"+ SEGMENT_FILE_EXT_NAME.toLowerCase(); // 正则匹配多个任意字符，后面拼有fileSegmentFlag变量值，接着拼有1个或多个数字数字，且后缀名为fileExtName变量值的文件名
 			List<File> files = FileUtils.getDirFiles(dirPath, regex);
 			
